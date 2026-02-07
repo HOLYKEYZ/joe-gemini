@@ -24,6 +24,10 @@ ENV/
 *.swp
 *.swo
 
+# Security
+*.pem
+*.key
+
 # OS
 .DS_Store
 Thumbs.db
