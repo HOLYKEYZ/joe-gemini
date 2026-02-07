@@ -5,6 +5,7 @@ import re
 import requests
 import hmac
 import hashlib
+import time
 from flask import Flask, request, jsonify
 from github import Github, GithubIntegration
 
@@ -50,11 +51,55 @@ def get_github_client(installation_id):
 
 # ... (get_github_client) ...
 
-def query_gemini(prompt):
+# ... (get_github_client helper remains) ...
+
+def fetch_memory(repo, issue_number, bot_login):
+    try:
+        issue = repo.get_issue(number=issue_number)
+        comments = issue.get_comments()
+        history = [c.body for c in comments if c.user.login.lower() == bot_login.lower()]
+        return "\n---\n".join(history[-5:])
+    except Exception as e:
+        print(f"Memory fetch error: {e}")
+        return ""
+
+def extract_json_from_response(text):
+    if not text: return None
+    json_patterns = [r'```json\s*([\s\S]*?)\s*```', r'```\s*([\s\S]*?)\s*```', r'\{[\s\S]*"files"[\s\S]*\}']
+    for pattern in json_patterns:
+        match = re.search(pattern, text)
+        if match:
+            try:
+                json_str = match.group(1) if '```' in pattern else match.group(0)
+                return json.loads(json_str)
+            except: continue
+    return None
+
+def commit_changes_via_api(repo, branch_name, file_changes, commit_message):
+    try:
+        sb = repo.get_branch(repo.default_branch)
+        repo.create_git_ref(ref=f"refs/heads/{branch_name}", sha=sb.commit.sha)
+        for path, content in file_changes.items():
+            try:
+                contents = repo.get_contents(path, ref=branch_name)
+                repo.update_file(path, commit_message, content, contents.sha, branch=branch_name)
+            except:
+                repo.create_file(path, commit_message, content, branch=branch_name)
+        return True
+    except Exception as e:
+        print(f"API Commit Error: {e}")
+        return False
+
+def query_gemini(prompt, context="", temperature=0.4):
     headers = {'Content-Type': 'application/json'}
+    final_prompt = f"""You are an autonomous GitHub bot called @joe-gemini.
+Context: {context}
+Request: {prompt}
+Instructions: Be concise. If writing code, return full files."""
+    
     payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 8192}
+        "contents": [{"parts": [{"text": final_prompt}]}],
+        "generationConfig": {"temperature": temperature, "maxOutputTokens": 16000}
     }
     try:
         r = requests.post(f"{GEMINI_API_URL}?key={GEMINI_API_KEY}", json=payload, headers=headers)
@@ -63,6 +108,16 @@ def query_gemini(prompt):
     except Exception as e:
         print(f"Gemini Error: {e}")
         return None
+
+def query_gemini_for_code(prompt, context=""):
+    code_prompt = f"""{prompt}
+IMPORTANT: If suggestions involve file changes, respond options:
+1. Normal text.
+2. JSON for auto-apply:
+```json
+{{ "explanation": "...", "files": {{ "path/to/file": "content" }} }}
+```"""
+    return query_gemini(code_prompt, context)
 
 @app.route('/', methods=['GET'])
 # ...
@@ -124,54 +179,85 @@ Diff:
         print(f"Error reviewing PR: {e}")
 
 def handle_issue_comment(payload):
-    # ... (existing handle_issue_comment logic) ...
     installation = payload.get('installation')
-    if not installation:
-        return
+    if not installation: return
 
-    # Authenticate as App Installation
     gh = get_github_client(installation['id'])
-    
     repo_info = payload['repository']
     repo = gh.get_repo(repo_info['full_name'])
     comment = payload['comment']
     issue_number = payload['issue']['number']
     
+    # Get Bot User
+    bot_user = gh.get_user()
+    bot_login = bot_user.login
+    
     body = comment.get('body', '').lower()
     
-    # Check mentions
-    if "joe-gemini" not in body and f"@{repo_info['owner']['login']}" not in body:
-         # TODO: Add robust reply check here if needed
-         return
+    # Check mentions & replies
+    mentioned = False
+    if "joe-gemini" in body:
+        mentioned = True
+    else:
+        # Check thread history for reply
+        try:
+            issue = repo.get_issue(number=issue_number)
+            comments = list(issue.get_comments())
+            if comments:
+                last = comments[-1]
+                # If current webhook payload is the last comment (it usually is)
+                if str(last.id) == str(comment.get('id')):
+                     if len(comments) > 1 and comments[-2].user.login == bot_login:
+                         mentioned = True
+                elif last.user.login == bot_login:
+                     mentioned = True
+        except: pass
+    
+    if not mentioned: return
 
-    # Logic from autonomous_bot.py adapted
+    # Mentioned! Let's act.
     try:
         issue = repo.get_issue(number=issue_number)
         
-        # Determine if PR
-        pr_number = issue.number if issue.pull_request else None
+        # 1. Fetch Memory
+        memory = fetch_memory(repo, issue_number, bot_login)
         
-        # Context
-        context = f"User Comment: {comment['body']}\n\n"
-        if pr_number:
-             try:
-                 pr = repo.get_pull(pr_number)
-                 context += f"PR Title: {pr.title}\nPR Body: {pr.body}\n"
-             except: pass
-
-        # Gemini Query
-        headers = {'Content-Type': 'application/json'}
-        gemini_payload = {
-            "contents": [{"parts": [{"text": f"You are @joe-gemini, a helpful GitHub bot. act as an agent. Context: {context}. User says: {comment['body']}"}]}],
-             "generationConfig": {"temperature": 0.4, "maxOutputTokens": 2048}
-        }
+        # 2. Context
+        pr_context = ""
+        if issue.pull_request:
+            try:
+                pr = repo.get_pull(issue_number)
+                diff_url = pr.diff_url
+                diff_content = requests.get(diff_url).text[:20000] # Limit
+                pr_context = f"PR Title: {pr.title}\nDiff:\n{diff_content}"
+            except: pass
+    
+        full_context = f"History:\n{memory}\n\n{pr_context}"
         
-        r = requests.post(f"{GEMINI_API_URL}?key={GEMINI_API_KEY}", json=gemini_payload, headers=headers)
-        r.raise_for_status()
-        response_text = r.json()['candidates'][0]['content']['parts'][0]['text']
+        # 3. Plan
+        plan = query_gemini(f"User Request: {comment['body']}\n\nCreate a plan.", full_context)
+        if not plan: return
         
-        issue.create_comment(response_text)
+        issue.create_comment(f"🤖 **Plan:**\n{plan}")
         
+        # 4. Code?
+        if any(k in body for k in ['fix', 'code', 'implement', 'change']):
+            code = query_gemini_for_code(f"Generate code for plan: {plan}", full_context)
+            parsed = extract_json_from_response(code)
+            
+            if parsed and 'files' in parsed:
+                branch = f"joe-gemini/fix-{issue_number}-{int(time.time())}"
+                if commit_changes_via_api(repo, branch, parsed['files'], f"Fix: {parsed.get('explanation', 'Automated fix')}"):
+                    msg = f"✅ Committed to branch `{branch}`.\n\nChanges: {parsed.get('explanation')}"
+                    issue.create_comment(msg)
+                    # Try to open PR
+                    try:
+                        repo.create_pull(title=f"Fix for #{issue_number}", body=f"Automated fix based on plan.\n{parsed.get('explanation')}", head=branch, base=repo.default_branch)
+                        issue.create_comment(f"🚀 Created PR for `{branch}`")
+                    except Exception as e:
+                        print(f"PR Creation error: {e}")
+            else:
+                issue.create_comment(f"💡 **Thoughts:**\n{code}")
     except Exception as e:
         print(f"Error processing comment: {e}")
 
