@@ -28,5 +28,5 @@ This bot is designed to be deployed as a **GitHub App** hosted on **Vercel**.
 -   **PyGithub**: GitHub API interaction.
 -   **Vercel**: Serverless hosting.
 
-## ⚠️ Note
+## ℹ️ Note
 This bot was built for my own personal usage to automate my workflows, but anyone is welcome to use it, deploy it, or fork it for their own projects! Happy coding! 🚀
