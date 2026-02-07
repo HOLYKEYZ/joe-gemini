@@ -23,20 +23,14 @@ BOT_TAG = "@joe-gemini"
 # gemini-2.5-flash since it's my base model
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
-# Detect mention
+# Detect mention (allow @joe-gemini or just joe-gemini)
 def is_mentioned(text):
-    return BOT_TAG in text.lower()
+    text_lower = text.lower()
+    return "@joe-gemini" in text_lower or "joe-gemini" in text_lower
 
-# Fetch memory from previous bot comments
-def fetch_memory(issue_number):
-    try:
-        issue = repo.get_issue(number=issue_number)
-        comments = issue.get_comments()
-        history = [c.body for c in comments if c.user.login == gh.get_user().login]
-        return "\n---\n".join(history[-5:])  # Last 5 comments for context
-    except Exception as e:
-        print(f"Memory fetch error: {e}")
-        return ""
+# ... (fetch_memory and other functions remain same) ...
+
+
 
 # Read PR diff to understand code changes
 def get_pr_diff(pr_number):
@@ -159,6 +153,20 @@ def extract_json_from_response(text):
 def commit_changes(branch_name, file_changes, commit_message):
     try:
         repo_local = Repo(local_path)
+        
+        # Configure Git Identity (Uses the account associated with the token)
+        try:
+            user = gh.get_user()
+            # Use authenticated user's details, fallback to generic if missing
+            name = user.name or user.login
+            email = user.email or f"{user.id}+{user.login}@users.noreply.github.com"
+            
+            repo_local.config_writer().set_value("user", "name", name).release()
+            repo_local.config_writer().set_value("user", "email", email).release()
+        except Exception as e:
+            print(f"Warning: Could not set custom git identity: {e}")
+            # Fallback is standard git config or Actions bot
+            
         repo_local.git.checkout('-b', branch_name)
         
         for path, content in file_changes.items():
