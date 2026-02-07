@@ -20,8 +20,8 @@ local_path = "/tmp/repo"
 Repo.clone_from(repo.clone_url.replace("https://", f"https://{GITHUB_TOKEN}@"), local_path)
 
 BOT_TAG = "@joe-gemini"
-# Using gemini-1.5-flash for larger context window and speed
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+# gemini-2.5-flash since it's my base model
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
 # Detect mention
 def is_mentioned(text):
@@ -92,7 +92,7 @@ Instructions:
         }],
         "generationConfig": {
             "temperature": 0.4,
-            "maxOutputTokens": 8192
+            "maxOutputTokens": 16384
         }
     }
     
