@@ -42,9 +42,30 @@ def get_github_client(installation_id):
 
 # ... (verify_signature helper remains) ...
 
-# ... (get_github_client helper remains) ...
+# ... (imports) ...
+
+# ... (config) ...
+
+# ... (verify_signature) ...
+
+# ... (get_github_client) ...
+
+def query_gemini(prompt):
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 8192}
+    }
+    try:
+        r = requests.post(f"{GEMINI_API_URL}?key={GEMINI_API_KEY}", json=payload, headers=headers)
+        r.raise_for_status()
+        return r.json()['candidates'][0]['content']['parts'][0]['text']
+    except Exception as e:
+        print(f"Gemini Error: {e}")
+        return None
 
 @app.route('/', methods=['GET'])
+# ...
 def home():
     return "Joe-Gemini Vercel Bot is Active! 🚀", 200
 
@@ -58,13 +79,52 @@ def webhook():
     
     if event_type == 'issue_comment' and payload.get('action') == 'created':
         handle_issue_comment(payload)
-    elif event_type == 'pull_request' and payload.get('action') in ['opened', 'edited', 'synchronize']:
-         # Simplified PR handling for now - just acknowledge
-         pass
+    elif event_type == 'pull_request' and payload.get('action') in ['opened', 'synchronize']:
+         handle_pr(payload)
 
     return jsonify({'status': 'ok'})
 
+def handle_pr(payload):
+    installation = payload.get('installation')
+    if not installation:
+        return
+    
+    gh = get_github_client(installation['id'])
+    repo_info = payload['repository']
+    repo = gh.get_repo(repo_info['full_name'])
+    pr_number = payload['pull_request']['number']
+    pr = repo.get_pull(pr_number)
+    
+    # Get the Diff
+    # Note: For large PRs, this might be huge. We'll truncate if necessary.
+    try:
+        diff_url = pr.diff_url
+        diff_content = requests.get(diff_url).text
+        
+        if len(diff_content) > 60000:
+             diff_content = diff_content[:60000] + "\n...(truncated due to size)..."
+             
+        prompt = f"""
+You are an expert code reviewer. Review the following Pull Request diff. 
+Identify potential bugs, security issues, or code style improvements.
+Be concise and constructive.
+
+PR Title: {pr.title}
+PR Description: {pr.body}
+
+Diff:
+{diff_content}
+"""
+        review = query_gemini(prompt)
+        
+        if review:
+            pr.create_issue_comment(f"🤖 **Automated Code Review**\n\n{review}")
+            
+    except Exception as e:
+        print(f"Error reviewing PR: {e}")
+
 def handle_issue_comment(payload):
+    # ... (existing handle_issue_comment logic) ...
     installation = payload.get('installation')
     if not installation:
         return
@@ -118,5 +178,4 @@ def handle_issue_comment(payload):
 if __name__ == '__main__':
     app.run(port=3000)
 
-if __name__ == '__main__':
-    app.run(port=3000)
+
