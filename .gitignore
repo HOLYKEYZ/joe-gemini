@@ -1,7 +1,12 @@
-# Environment variables (NEVER commit API keys)
+# Environment variables
 .env
 *.env
 .env.*
+
+# Local Test Files
+mock_event.json
+run_local.py
+/tmp/
 
 # Python
 __pycache__/
