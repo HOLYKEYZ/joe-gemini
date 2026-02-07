@@ -237,9 +237,9 @@ Files Changed:
             parsed = extract_json_from_response(code_response)
             
             if parsed and 'files' in parsed:
-                branch_name = f"norai-bot/fix-{target_number}-{int(__import__('time').time())}"
+                branch_name = f"joe-gemini/fix-{target_number}-{int(__import__('time').time())}"
                 
-                if commit_changes(branch_name, parsed['files'], f"[norai-bot] {parsed.get('explanation', 'Automated fix')}"):
+                if commit_changes(branch_name, parsed['files'], f"[joe-gemini] {parsed.get('explanation', 'Automated fix')}"):
                     post_comment(target_number, f"✅ Committed changes to branch `{branch_name}`\n\n**Changes:**\n{parsed.get('explanation', 'See branch for details')}")
                 else:
                     post_comment(target_number, f"⚠️ Generated changes but failed to commit. Here's what I planned:\n\n{code_response[:2000]}")
