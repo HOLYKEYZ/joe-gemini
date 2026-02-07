@@ -23,10 +23,28 @@ BOT_TAG = "@joe-gemini"
 # gemini-2.5-flash since it's my base model
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
-# Detect mention (allow @joe-gemini or just joe-gemini)
-def is_mentioned(text):
-    text_lower = text.lower()
-    return "@joe-gemini" in text_lower or "joe-gemini" in text_lower
+# Detect mention (allow @joe-gemini, joe-gemini, or replies to bot)
+def is_mentioned(comment, bot_user_login):
+    text = comment.get('body', '').lower()
+    
+    # Check for text mentions
+    if "@joe-gemini" in text or "joe-gemini" in text:
+        return True
+    
+    # Check if it's a direct reply to the bot (GitHub UI reply)
+    # Note: GitHub webhooks provide 'in_reply_to_id' for PR review comments, 
+    # but for issue comments, we might need to check if we are the parent.
+    # However, a simpler heuristic for "quoting" is checking if the body contains the bot's previous text
+    # or if the user is replying to a thread started by the bot.
+    # Since we can't easily check threading for every event without more API calls,
+    # we'll stick to text matching + maybe checking if the comment starts with > (quote) 
+    # and we were the last commenter? No, that's too active.
+    
+    # Actually, for PR review comments, 'in_reply_to_id' exists. 
+    # For issue comments, effective "replying" usually involves quoting or tagging.
+    # If the user quotes the bot but doesn't tag, the text usually contains ">"
+    
+    return False # Placeholder - logic moved to main for context access
 
 # ... (fetch_memory and other functions remain same) ...
 
@@ -207,6 +225,38 @@ def main():
     
     target_number = issue_number or pr_number
     
+    # Identify bot user
+    bot_user = gh.get_user()
+    bot_login = bot_user.login.lower()
+    
+    # Check if mentioned or replying
+    mentioned = False
+    if "@joe-gemini" in comment_body.lower() or "joe-gemini" in comment_body.lower():
+        mentioned = True
+    else:
+        # Check if replying to bot's last comment (heuristic: last comment on issue was from bot)
+        try:
+            issue = repo.get_issue(number=target_number)
+            comments = list(issue.get_comments())
+            # If there are comments and the one before this (last one excluding current webhook payload usually) was bot
+            # Note: The webhook payload comment is already created on GitHub usually.
+            # Let's check the last comment in the thread.
+            if comments:
+                last_comment = comments[-1]
+                # If the current comment is the last one, check the one before it
+                if str(last_comment.id) == str(event.get('comment', {}).get('id')):
+                    if len(comments) > 1 and comments[-2].user.login.lower() == bot_login:
+                        mentioned = True
+                elif last_comment.user.login.lower() == bot_login:
+                     # This case handles race conditions or if webhook fires before list update
+                    mentioned = True
+        except Exception as e:
+            print(f"Error checking thread history: {e}")
+
+    if not (issue_number or pr_number) or not mentioned:
+        print("Bot not mentioned and not complying to reply logic. Exiting.")
+        return
+
     # Build context
     memory = fetch_memory(target_number)
     pr_context = ""
