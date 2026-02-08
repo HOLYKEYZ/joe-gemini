@@ -46,8 +46,46 @@ def is_mentioned(comment, bot_user_login):
     
     return False # Placeholder - logic moved to main for context access
 
-# ... (fetch_memory and other functions remain same) ...
+# Fetch memory from bot's previous comments on this issue/PR
+def fetch_memory(target_number):
+    """Read bot's previous comments and extract [MEMORY] blocks."""
+    try:
+        issue = repo.get_issue(number=target_number)
+        bot_user = gh.get_user()
+        bot_login = bot_user.login.lower()
+        
+        memory_data = {
+            "files_read": [],
+            "context_summary": ""
+        }
+        
+        for comment in issue.get_comments():
+            if comment.user.login.lower() == bot_login:
+                body = comment.body
+                # Look for hidden memory block
+                memory_match = re.search(r'<!-- \[MEMORY\]([\s\S]*?)\[/MEMORY\] -->', body)
+                if memory_match:
+                    try:
+                        mem = json.loads(memory_match.group(1).strip())
+                        # Merge files_read lists
+                        if 'files_read' in mem:
+                            memory_data['files_read'].extend(mem['files_read'])
+                        if 'context_summary' in mem:
+                            memory_data['context_summary'] = mem['context_summary']
+                    except json.JSONDecodeError:
+                        pass
+        
+        # Deduplicate files
+        memory_data['files_read'] = list(set(memory_data['files_read']))
+        return memory_data
+    except Exception as e:
+        print(f"Memory fetch error: {e}")
+        return {"files_read": [], "context_summary": ""}
 
+# Save memory by appending to the comment
+def format_memory_block(data):
+    """Format memory data as a hidden HTML comment."""
+    return f"\n\n<!-- [MEMORY]{json.dumps(data)}[/MEMORY] -->"
 
 
 # Read PR diff to understand code changes
@@ -247,6 +285,9 @@ def get_repo_structure(path, max_depth=2, current_depth=0):
 # Read relevant configuration files
 def read_relevant_configs():
     config_files = [
+        "README.md",
+        "README",
+        "readme.md",
         "package.json",
         "pnpm-lock.yaml",
         "yarn.lock",
@@ -352,12 +393,15 @@ def main():
         print("Bot not mentioned and not complying to reply logic. Exiting.")
         return
 
-    # Build initial context with Repo Structure and Configs
+    # Build initial context - only Repo Structure (no hardcoded file content)
     print("Building repository context...")
     repo_structure = get_repo_structure(local_path)
-    config_context = read_relevant_configs()
     
+    # Fetch memory from previous interactions
     memory = fetch_memory(target_number)
+    files_already_read = memory.get('files_read', [])
+    print(f"Memory: already read {len(files_already_read)} files: {files_already_read}")
+    
     pr_context = ""
     
     if pr_number:
@@ -371,48 +415,59 @@ Files Changed:
 """
     
     base_context = f"""
-Repository Structure (Root):
+Repository Structure (file list):
 {repo_structure}
 
-{config_context}
-
-Memory from previous interactions:
-{memory}
+Files I have already read for this PR (from memory):
+{', '.join(files_already_read) if files_already_read else 'None yet'}
 
 {pr_context}
 """
 
-    # Step 1: Context Expansion - Check if we need more files
-    print("Step 1: Analyzing request for missing context...")
+    # Step 1: Context Expansion - Ask Gemini what files it needs
+    print("Step 1: Asking Gemini what files it needs...")
     needed_files = get_context_expansion_files(comment_body, base_context)
     
     expanded_context = base_context
+    new_files_read = []
+    
     if needed_files and isinstance(needed_files, list) and len(needed_files) > 0:
-        print(f"Bot requested to read: {needed_files}")
-        post_comment(target_number, f"👀 I need to check some files to be sure: `{', '.join(needed_files[:5])}`...")
+        # Filter out files we've already read
+        files_to_read = [f for f in needed_files if f not in files_already_read][:5]
         
-        file_contents = ""
-        for file_path in needed_files[:5]: # Limit to 5 files to save tokens/time
-             # Secure path check to prevent traversing up
-             if ".." in file_path or file_path.startswith("/"):
-                 continue
-                 
-             content = read_file_content(file_path)
-             if content:
-                 file_contents += f"\n--- {file_path} ---\n{content}\n"
-        
-        expanded_context += f"\n\nRequested File Contents:\n{file_contents}"
+        if files_to_read:
+            print(f"Reading new files: {files_to_read}")
+            post_comment(target_number, f"👀 Checking: `{', '.join(files_to_read)}`...")
+            
+            file_contents = ""
+            for file_path in files_to_read:
+                # Secure path check
+                if ".." in file_path or file_path.startswith("/"):
+                    continue
+                
+                content = read_file_content(file_path)
+                if content:
+                    file_contents += f"\n--- {file_path} ---\n{content}\n"
+                    new_files_read.append(file_path)
+            
+            expanded_context += f"\n\nFile Contents:\n{file_contents}"
+        else:
+            print("All requested files already in memory, skipping read.")
     
     # Step 2: Generate plan with full context
     print("Step 2: Generating plan...")
-    plan_prompt = f"User request: {comment_body}\n\nAnalyze this request and create a plan to address it. \nIMPORTANT: Verify your plan against the 'Configuration Files' and 'Repository Structure' provided."
+    plan_prompt = f"User request: {comment_body}\n\nAnalyze and respond. If you read files, use them to verify your answer."
     plan = query_gemini(plan_prompt, expanded_context)
     
     if not plan:
         post_comment(target_number, "❌ Sorry, I couldn't process your request. Please try again.")
         return
     
-    post_comment(target_number, f"🤖 **Agent Plan:**\n\n{plan}")
+    # Save memory of files read
+    all_files_read = files_already_read + new_files_read
+    memory_block = format_memory_block({"files_read": all_files_read})
+    
+    post_comment(target_number, f"🤖 **Response:**\n\n{plan}{memory_block}")
     
     # Step 3: Check if code changes are needed
     if any(keyword in comment_body.lower() for keyword in ['fix', 'change', 'update', 'add', 'remove', 'refactor', 'implement']):

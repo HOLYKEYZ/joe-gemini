@@ -1,4 +1,4 @@
-# Joe-Gemini 🤖
+# joe-gemini 🤖
 
 Joe-Gemini is an autonomous GitHub bot powered by **Google Gemini 2.5 Flash**. It lives in your repository, reviews code, fixes bugs, and improves your project autonomously.
 
