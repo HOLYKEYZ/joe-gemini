@@ -212,6 +212,101 @@ def post_comment(issue_number, body):
         print(f"Comment error: {e}")
         return False
 
+# Helper: Estimate token count (very rough approximation)
+def get_token_count(text):
+    return len(text) // 4
+
+# Get repository structure as a tree string
+def get_repo_structure(path, max_depth=2, current_depth=0):
+    if current_depth > max_depth:
+        return ""
+    
+    structure = ""
+    try:
+        # Sort so directories come first, then files
+        items = sorted(os.listdir(path), key=lambda x: (not os.path.isdir(os.path.join(path, x)), x))
+        
+        for item in items:
+            if item.startswith('.'): # Skip hidden files/dirs
+                continue
+                
+            full_path = os.path.join(path, item)
+            is_dir = os.path.isdir(full_path)
+            
+            indent = "  " * current_depth
+            marker = "📁 " if is_dir else "📄 "
+            structure += f"{indent}{marker}{item}\n"
+            
+            if is_dir:
+                structure += get_repo_structure(full_path, max_depth, current_depth + 1)
+    except Exception as e:
+        structure += f"Error listing {path}: {e}\n"
+        
+    return structure
+
+# Read relevant configuration files
+def read_relevant_configs():
+    config_files = [
+        "package.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+        "package-lock.json",
+        "requirements.txt",
+        "pyproject.toml",
+        "vercel.json",
+        "next.config.js",
+        "vite.config.ts",
+        "vite.config.js",
+        "tsconfig.json"
+    ]
+    
+    context = "Configuration Files:\n"
+    found = False
+    
+    for relative_path in config_files:
+        full_path = os.path.join(local_path, relative_path)
+        if os.path.exists(full_path):
+            found = True
+            try:
+                with open(full_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    # Truncate large config files (especially lockfiles)
+                    if len(content) > 5000:
+                         context += f"\n--- {relative_path} (Truncated first 5000 chars) ---\n{content[:5000]}\n...\n"
+                    else:
+                        context += f"\n--- {relative_path} ---\n{content}\n"
+            except Exception as e:
+                context += f"\n--- {relative_path} (Error reading) ---\n{e}\n"
+    
+    if not found:
+        return ""
+    return context
+
+# Step 1: Analyze Context and Request More Files
+def get_context_expansion_files(prompt, initial_context):
+    analysis_prompt = f"""You are an expert developer.
+    
+User Request: {prompt}
+
+Current Context:
+{initial_context}
+
+Task: Determine if you need to read any specific files from the repository to answer the request accurately or to check syntax/conventions (e.g. checking for pnpm vs npm, verify existing patterns).
+If you need to read files, list them as a JSON array of file paths.
+If you have enough information, return an empty array [].
+
+Response Format:
+```json
+[
+  "path/to/file1.ext",
+  "path/to/file2.ext"
+]
+```
+Do not explain. Just return the JSON.
+"""
+    response = query_gemini(analysis_prompt, initial_context)
+    return extract_json_from_response(response)
+
 # Main logic
 def main():
     comment_body = event.get('comment', {}).get('body', '')
@@ -257,7 +352,11 @@ def main():
         print("Bot not mentioned and not complying to reply logic. Exiting.")
         return
 
-    # Build context
+    # Build initial context with Repo Structure and Configs
+    print("Building repository context...")
+    repo_structure = get_repo_structure(local_path)
+    config_context = read_relevant_configs()
+    
     memory = fetch_memory(target_number)
     pr_context = ""
     
@@ -271,14 +370,43 @@ Files Changed:
 {json.dumps(pr_diff['files'], indent=2)[:3000]}
 """
     
-    full_context = f"""Memory from previous interactions:
+    base_context = f"""
+Repository Structure (Root):
+{repo_structure}
+
+{config_context}
+
+Memory from previous interactions:
 {memory}
 
-{pr_context}"""
+{pr_context}
+"""
+
+    # Step 1: Context Expansion - Check if we need more files
+    print("Step 1: Analyzing request for missing context...")
+    needed_files = get_context_expansion_files(comment_body, base_context)
     
-    # Step 1: Generate plan
-    plan_prompt = f"User request: {comment_body}\n\nAnalyze this request and create a plan to address it."
-    plan = query_gemini(plan_prompt, full_context)
+    expanded_context = base_context
+    if needed_files and isinstance(needed_files, list) and len(needed_files) > 0:
+        print(f"Bot requested to read: {needed_files}")
+        post_comment(target_number, f"👀 I need to check some files to be sure: `{', '.join(needed_files[:5])}`...")
+        
+        file_contents = ""
+        for file_path in needed_files[:5]: # Limit to 5 files to save tokens/time
+             # Secure path check to prevent traversing up
+             if ".." in file_path or file_path.startswith("/"):
+                 continue
+                 
+             content = read_file_content(file_path)
+             if content:
+                 file_contents += f"\n--- {file_path} ---\n{content}\n"
+        
+        expanded_context += f"\n\nRequested File Contents:\n{file_contents}"
+    
+    # Step 2: Generate plan with full context
+    print("Step 2: Generating plan...")
+    plan_prompt = f"User request: {comment_body}\n\nAnalyze this request and create a plan to address it. \nIMPORTANT: Verify your plan against the 'Configuration Files' and 'Repository Structure' provided."
+    plan = query_gemini(plan_prompt, expanded_context)
     
     if not plan:
         post_comment(target_number, "❌ Sorry, I couldn't process your request. Please try again.")
@@ -286,10 +414,10 @@ Files Changed:
     
     post_comment(target_number, f"🤖 **Agent Plan:**\n\n{plan}")
     
-    # Step 2: Check if code changes are needed
+    # Step 3: Check if code changes are needed
     if any(keyword in comment_body.lower() for keyword in ['fix', 'change', 'update', 'add', 'remove', 'refactor', 'implement']):
-        code_prompt = f"Based on the plan above, generate the necessary code changes.\n\nPlan: {plan}"
-        code_response = query_gemini_for_code(code_prompt, full_context)
+        code_prompt = f"Based on the plan above, generate the necessary code changes.\n\nPlan: {plan}\n\nEnsure you use the correct syntax and dependencies found in the context."
+        code_response = query_gemini_for_code(code_prompt, expanded_context)
         
         if code_response:
             parsed = extract_json_from_response(code_response)
