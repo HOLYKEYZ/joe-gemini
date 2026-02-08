@@ -54,14 +54,95 @@ def get_github_client(installation_id):
 # ... (get_github_client helper remains) ...
 
 def fetch_memory(repo, issue_number, bot_login):
+    """Read bot's previous comments and extract [MEMORY] blocks."""
     try:
         issue = repo.get_issue(number=issue_number)
-        comments = issue.get_comments()
-        history = [c.body for c in comments if c.user.login.lower() == bot_login.lower()]
-        return "\n---\n".join(history[-5:])
+        memory_data = {
+            "files_read": [],
+            "context_summary": ""
+        }
+        
+        for comment in issue.get_comments():
+            if comment.user.login.lower() == bot_login.lower():
+                body = comment.body
+                # Look for hidden memory block
+                memory_match = re.search(r'<!-- \[MEMORY\]([\s\S]*?)\[/MEMORY\] -->', body)
+                if memory_match:
+                    try:
+                        mem = json.loads(memory_match.group(1).strip())
+                        if 'files_read' in mem:
+                            memory_data['files_read'].extend(mem['files_read'])
+                        if 'context_summary' in mem:
+                            memory_data['context_summary'] = mem['context_summary']
+                    except json.JSONDecodeError:
+                        pass
+        
+        # Deduplicate files
+        memory_data['files_read'] = list(set(memory_data['files_read']))
+        return memory_data
     except Exception as e:
         print(f"Memory fetch error: {e}")
+        return {"files_read": [], "context_summary": ""}
+
+def format_memory_block(data):
+    """Format memory data as a hidden HTML comment."""
+    return f"\n\n<!-- [MEMORY]{json.dumps(data)}[/MEMORY] -->"
+
+def get_repo_structure(repo, path="", max_depth=2, current_depth=0):
+    """Get repository file structure via GitHub API."""
+    if current_depth > max_depth:
         return ""
+    
+    structure = ""
+    try:
+        contents = repo.get_contents(path)
+        items = sorted(contents, key=lambda x: (x.type != 'dir', x.name))
+        
+        for item in items:
+            if item.name.startswith('.'):
+                continue
+            
+            indent = "  " * current_depth
+            marker = "📁 " if item.type == 'dir' else "📄 "
+            structure += f"{indent}{marker}{item.name}\n"
+            
+            if item.type == 'dir':
+                structure += get_repo_structure(repo, item.path, max_depth, current_depth + 1)
+    except Exception as e:
+        structure += f"Error listing {path}: {e}\n"
+    
+    return structure
+
+def read_file_content(repo, file_path):
+    """Read file content from repo."""
+    try:
+        content = repo.get_contents(file_path)
+        return content.decoded_content.decode('utf-8')[:5000]  # Limit size
+    except Exception as e:
+        print(f"File read error for {file_path}: {e}")
+        return None
+
+def get_context_expansion_files(prompt, initial_context):
+    """Ask Gemini what files it needs to read."""
+    analysis_prompt = f"""You are an expert developer.
+
+User Request: {prompt}
+
+Current Context:
+{initial_context}
+
+Task: Determine if you need to read any specific files from the repository to answer accurately or verify syntax/conventions.
+If you need files, list them as a JSON array. If you have enough info, return [].
+
+Response Format:
+```json
+["path/to/file1.ext", "path/to/file2.ext"]
+```
+Do not explain. Just return the JSON.
+"""
+    response = query_gemini(analysis_prompt, initial_context)
+    return extract_json_from_response(response)
+
 
 def extract_json_from_response(text):
     if not text: return None
@@ -149,20 +230,29 @@ def handle_pr(payload):
     repo = gh.get_repo(repo_info['full_name'])
     pr_number = payload['pull_request']['number']
     pr = repo.get_pull(pr_number)
+    bot_login = gh.get_user().login
+    
+    # Fetch memory
+    memory = fetch_memory(repo, pr_number, bot_login)
+    files_already_read = memory.get('files_read', [])
+    
+    # Get repo structure
+    repo_structure = get_repo_structure(repo)
     
     # Get the Diff
-    # Note: For large PRs, this might be huge. We'll truncate if necessary.
     try:
         diff_url = pr.diff_url
         diff_content = requests.get(diff_url).text
         
         if len(diff_content) > 60000:
-             diff_content = diff_content[:60000] + "\n...(truncated due to size)..."
-             
-        prompt = f"""
-You are an expert code reviewer. Review the following Pull Request diff. 
-Identify potential bugs, security issues, or code style improvements.
-Be concise and constructive.
+            diff_content = diff_content[:60000] + "\n...(truncated)..."
+        
+        base_context = f"""
+Repository Structure:
+{repo_structure}
+
+Files already read (from memory):
+{', '.join(files_already_read) if files_already_read else 'None'}
 
 PR Title: {pr.title}
 PR Description: {pr.body}
@@ -170,10 +260,41 @@ PR Description: {pr.body}
 Diff:
 {diff_content}
 """
+        
+        # Step 1: Ask what files to read
+        needed_files = get_context_expansion_files(f"Review this PR: {pr.title}", base_context)
+        
+        expanded_context = base_context
+        new_files_read = []
+        
+        if needed_files and isinstance(needed_files, list):
+            files_to_read = [f for f in needed_files if f not in files_already_read][:5]
+            
+            if files_to_read:
+                file_contents = ""
+                for file_path in files_to_read:
+                    if ".." in file_path or file_path.startswith("/"):
+                        continue
+                    content = read_file_content(repo, file_path)
+                    if content:
+                        file_contents += f"\n--- {file_path} ---\n{content}\n"
+                        new_files_read.append(file_path)
+                
+                expanded_context += f"\n\nFile Contents:\n{file_contents}"
+        
+        # Step 2: Generate review
+        prompt = f"""You are an expert code reviewer. Review this PR.
+Identify bugs, security issues, or improvements. Be concise.
+
+Context:
+{expanded_context}
+"""
         review = query_gemini(prompt)
         
         if review:
-            pr.create_issue_comment(f"🤖 **Automated Code Review**\n\n{review}")
+            all_files = files_already_read + new_files_read
+            memory_block = format_memory_block({"files_read": all_files})
+            pr.create_issue_comment(f"🤖 **Automated Code Review**\n\n{review}{memory_block}")
             
     except Exception as e:
         print(f"Error reviewing PR: {e}")
@@ -188,7 +309,6 @@ def handle_issue_comment(payload):
     comment = payload['comment']
     issue_number = payload['issue']['number']
     
-    # Get Bot User
     bot_user = gh.get_user()
     bot_login = bot_user.login
     
@@ -199,50 +319,84 @@ def handle_issue_comment(payload):
     if "joe-gemini" in body:
         mentioned = True
     else:
-        # Check thread history for reply
         try:
             issue = repo.get_issue(number=issue_number)
             comments = list(issue.get_comments())
             if comments:
                 last = comments[-1]
-                # If current webhook payload is the last comment (it usually is)
                 if str(last.id) == str(comment.get('id')):
-                     if len(comments) > 1 and comments[-2].user.login == bot_login:
-                         mentioned = True
+                    if len(comments) > 1 and comments[-2].user.login == bot_login:
+                        mentioned = True
                 elif last.user.login == bot_login:
-                     mentioned = True
+                    mentioned = True
         except: pass
     
     if not mentioned: return
 
-    # Mentioned! Let's act.
     try:
         issue = repo.get_issue(number=issue_number)
         
-        # 1. Fetch Memory
+        # 1. Fetch Memory with [MEMORY] blocks
         memory = fetch_memory(repo, issue_number, bot_login)
+        files_already_read = memory.get('files_read', [])
         
-        # 2. Context
+        # 2. Get repo structure
+        repo_structure = get_repo_structure(repo)
+        
+        # 3. PR Context if applicable
         pr_context = ""
         if issue.pull_request:
             try:
                 pr = repo.get_pull(issue_number)
-                diff_url = pr.diff_url
-                diff_content = requests.get(diff_url).text[:20000] # Limit
+                diff_content = requests.get(pr.diff_url).text[:20000]
                 pr_context = f"PR Title: {pr.title}\nDiff:\n{diff_content}"
             except: pass
     
-        full_context = f"History:\n{memory}\n\n{pr_context}"
+        base_context = f"""
+Repository Structure:
+{repo_structure}
+
+Files already read (from memory):
+{', '.join(files_already_read) if files_already_read else 'None'}
+
+{pr_context}
+"""
         
-        # 3. Plan
-        plan = query_gemini(f"User Request: {comment['body']}\n\nCreate a plan.", full_context)
+        # 4. Ask Gemini what files it needs
+        needed_files = get_context_expansion_files(comment['body'], base_context)
+        
+        expanded_context = base_context
+        new_files_read = []
+        
+        if needed_files and isinstance(needed_files, list):
+            files_to_read = [f for f in needed_files if f not in files_already_read][:5]
+            
+            if files_to_read:
+                issue.create_comment(f"👀 Checking: `{', '.join(files_to_read)}`...")
+                
+                file_contents = ""
+                for file_path in files_to_read:
+                    if ".." in file_path or file_path.startswith("/"):
+                        continue
+                    content = read_file_content(repo, file_path)
+                    if content:
+                        file_contents += f"\n--- {file_path} ---\n{content}\n"
+                        new_files_read.append(file_path)
+                
+                expanded_context += f"\n\nFile Contents:\n{file_contents}"
+        
+        # 5. Generate response
+        plan = query_gemini(f"User Request: {comment['body']}\n\nRespond using the context provided.", expanded_context)
         if not plan: return
         
-        issue.create_comment(f"🤖 **Plan:**\n{plan}")
+        all_files = files_already_read + new_files_read
+        memory_block = format_memory_block({"files_read": all_files})
         
-        # 4. Code?
+        issue.create_comment(f"🤖 **Response:**\n{plan}{memory_block}")
+        
+        # 6. Code changes?
         if any(k in body for k in ['fix', 'code', 'implement', 'change']):
-            code = query_gemini_for_code(f"Generate code for plan: {plan}", full_context)
+            code = query_gemini_for_code(f"Generate code for: {plan}", expanded_context)
             parsed = extract_json_from_response(code)
             
             if parsed and 'files' in parsed:
@@ -250,9 +404,8 @@ def handle_issue_comment(payload):
                 if commit_changes_via_api(repo, branch, parsed['files'], f"Fix: {parsed.get('explanation', 'Automated fix')}"):
                     msg = f"✅ Committed to branch `{branch}`.\n\nChanges: {parsed.get('explanation')}"
                     issue.create_comment(msg)
-                    # Try to open PR
                     try:
-                        repo.create_pull(title=f"Fix for #{issue_number}", body=f"Automated fix based on plan.\n{parsed.get('explanation')}", head=branch, base=repo.default_branch)
+                        repo.create_pull(title=f"Fix for #{issue_number}", body=f"Automated fix.\n{parsed.get('explanation')}", head=branch, base=repo.default_branch)
                         issue.create_comment(f"🚀 Created PR for `{branch}`")
                     except Exception as e:
                         print(f"PR Creation error: {e}")
