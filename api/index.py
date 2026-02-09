@@ -88,17 +88,18 @@ def format_memory_block(data):
     """Format memory data as a hidden HTML comment."""
     return f"\n\n<!-- [MEMORY]{json.dumps(data)}[/MEMORY] -->"
 
-def get_repo_structure(repo, path="", max_depth=2, current_depth=0):
-    """Get repository file structure via GitHub API."""
+def get_repo_structure(repo, path="", max_depth=1, current_depth=0):
+    """Get repository file structure via GitHub API (single level to avoid timeout)."""
     if current_depth > max_depth:
         return ""
     
     structure = ""
     try:
         contents = repo.get_contents(path)
+        # Sort: dirs first, then files
         items = sorted(contents, key=lambda x: (x.type != 'dir', x.name))
         
-        for item in items:
+        for item in items[:30]:  # Limit to 30 items to avoid timeout
             if item.name.startswith('.'):
                 continue
             
@@ -106,10 +107,12 @@ def get_repo_structure(repo, path="", max_depth=2, current_depth=0):
             marker = "📁 " if item.type == 'dir' else "📄 "
             structure += f"{indent}{marker}{item.name}\n"
             
-            if item.type == 'dir':
+            # Only go 1 level deep to avoid timeout
+            if item.type == 'dir' and current_depth < max_depth:
                 structure += get_repo_structure(repo, item.path, max_depth, current_depth + 1)
     except Exception as e:
-        structure += f"Error listing {path}: {e}\n"
+        print(f"Repo structure error: {e}")
+        structure = f"Error: {e}\n"
     
     return structure
 
@@ -221,26 +224,30 @@ def webhook():
     return jsonify({'status': 'ok'})
 
 def handle_pr(payload):
-    installation = payload.get('installation')
-    if not installation:
-        return
-    
-    gh = get_github_client(installation['id'])
-    repo_info = payload['repository']
-    repo = gh.get_repo(repo_info['full_name'])
-    pr_number = payload['pull_request']['number']
-    pr = repo.get_pull(pr_number)
-    bot_login = gh.get_user().login
-    
-    # Fetch memory
-    memory = fetch_memory(repo, pr_number, bot_login)
-    files_already_read = memory.get('files_read', [])
-    
-    # Get repo structure
-    repo_structure = get_repo_structure(repo)
-    
-    # Get the Diff
+    """Handle PR opened/synchronized events."""
     try:
+        installation = payload.get('installation')
+        if not installation:
+            print("No installation in payload")
+            return
+        
+        gh = get_github_client(installation['id'])
+        repo_info = payload['repository']
+        repo = gh.get_repo(repo_info['full_name'])
+        pr_number = payload['pull_request']['number']
+        pr = repo.get_pull(pr_number)
+        bot_login = gh.get_user().login
+        
+        print(f"Processing PR #{pr_number} in {repo_info['full_name']}")
+        
+        # Fetch memory
+        memory = fetch_memory(repo, pr_number, bot_login)
+        files_already_read = memory.get('files_read', [])
+        
+        # Get repo structure (limited to avoid timeout)
+        repo_structure = get_repo_structure(repo)
+        
+        # Get the Diff
         diff_url = pr.diff_url
         diff_content = requests.get(diff_url).text
         
