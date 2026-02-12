@@ -231,6 +231,7 @@ def handle_pr(payload):
             print("No installation in payload")
             return
         
+
         gh = get_github_client(installation['id'])
         repo_info = payload['repository']
         repo = gh.get_repo(repo_info['full_name'])
@@ -238,14 +239,23 @@ def handle_pr(payload):
         pr = repo.get_pull(pr_number)
         bot_login = gh.get_user().login
         
-        print(f"Processing PR #{pr_number} in {repo_info['full_name']}")
+        # DEBUG: Verify we reached here
+        print(f"DEBUG: Processing PR #{pr_number}")
         
         # Fetch memory
-        memory = fetch_memory(repo, pr_number, bot_login)
-        files_already_read = memory.get('files_read', [])
+        try:
+            memory = fetch_memory(repo, pr_number, bot_login)
+            files_already_read = memory.get('files_read', [])
+        except Exception as e:
+            print(f"Memory fetch failed: {e}")
+            files_already_read = []
         
-        # Get repo structure (limited to avoid timeout)
-        repo_structure = get_repo_structure(repo)
+        # Get repo structure
+        try:
+            repo_structure = get_repo_structure(repo)
+        except Exception as e:
+            print(f"Structure fetch failed: {e}")
+            repo_structure = "(Structure fetch failed)"
         
         # Get the Diff
         diff_url = pr.diff_url
@@ -304,7 +314,15 @@ Context:
             pr.create_issue_comment(f"🤖 **Automated Code Review**\n\n{review}{memory_block}")
             
     except Exception as e:
-        print(f"Error reviewing PR: {e}")
+        import traceback
+        err_msg = traceback.format_exc()
+        print(f"Error reviewing PR: {err_msg}")
+        try:
+            # Try to report error to user if possible
+            if 'pr' in locals():
+                pr.create_issue_comment(f"⚠️ **Bot Error**: Something went wrong.\n\n```\n{err_msg}\n```")
+        except:
+            pass
 
 def handle_issue_comment(payload):
     installation = payload.get('installation')
