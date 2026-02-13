@@ -38,6 +38,20 @@ def get_github_client(installation_id):
     token = integration.get_access_token(installation_id).token
     return Github(token)
 
+# Helper: Get Bot Login
+BOT_LOGIN_CACHE = None
+def get_bot_login():
+    global BOT_LOGIN_CACHE
+    if BOT_LOGIN_CACHE:
+        return BOT_LOGIN_CACHE
+    try:
+        integration = GithubIntegration(APP_ID, PRIVATE_KEY)
+        BOT_LOGIN_CACHE = f"{integration.get_app().slug}[bot]"
+        return BOT_LOGIN_CACHE
+    except Exception as e:
+        print(f"Error getting bot login: {e}")
+        return "joe-gemini-bot[bot]"
+
 # ... (imports remain) ...
 # ... (config remain) ...
 
@@ -237,7 +251,7 @@ def handle_pr(payload):
         repo = gh.get_repo(repo_info['full_name'])
         pr_number = payload['pull_request']['number']
         pr = repo.get_pull(pr_number)
-        bot_login = gh.get_user().login
+        bot_login = get_bot_login()
         
         # DEBUG: Verify we reached here
         print(f"DEBUG: Processing PR #{pr_number}")
@@ -334,8 +348,7 @@ def handle_issue_comment(payload):
     comment = payload['comment']
     issue_number = payload['issue']['number']
     
-    bot_user = gh.get_user()
-    bot_login = bot_user.login
+    bot_login = get_bot_login()
     
     body = comment.get('body', '').lower()
     
