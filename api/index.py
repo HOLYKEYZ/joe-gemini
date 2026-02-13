@@ -193,7 +193,11 @@ def query_gemini(prompt, context="", temperature=0.4):
     final_prompt = f"""You are an autonomous GitHub bot called @joe-gemini.
 Context: {context}
 Request: {prompt}
-Instructions: Be concise. If writing code, return full files."""
+Instructions:
+1. Be concise and summarize your thoughts into ONE comment if possible.
+2. Do not reply to yourself unless absolutely necessary.
+3. If writing code, return full files.
+4. Focus on responding to other users if they reply to you."""
     
     payload = {
         "contents": [{"parts": [{"text": final_prompt}]}],
@@ -239,6 +243,11 @@ def webhook():
 
 def handle_pr(payload):
     """Handle PR opened/synchronized events."""
+    bot_login = get_bot_login()
+    # Don't review own PRs (if we ever create them)
+    if payload.get('pull_request', {}).get('user', {}).get('login') == bot_login:
+        return
+
     try:
         installation = payload.get('installation')
         if not installation:
@@ -350,23 +359,29 @@ def handle_issue_comment(payload):
     
     bot_login = get_bot_login()
     
+    # CRITICAL: Do not reply to self!
+    if comment.get('user', {}).get('login') == bot_login:
+        return
+
     body = comment.get('body', '').lower()
     
     # Check mentions & replies
     mentioned = False
     if "joe-gemini" in body:
+        # Only set mentioned=True if it's NOT the bot talking to itself
         mentioned = True
     else:
         try:
             issue = repo.get_issue(number=issue_number)
             comments = list(issue.get_comments())
-            if comments:
-                last = comments[-1]
-                if str(last.id) == str(comment.get('id')):
-                    if len(comments) > 1 and comments[-2].user.login == bot_login:
-                        mentioned = True
-                elif last.user.login == bot_login:
-                    mentioned = True
+            if len(comments) > 1:
+                last_comment = comments[-1]
+                prev_comment = comments[-2]
+                
+                # If this comment replies to a bot comment
+                if str(last_comment.id) == str(comment.get('id')):
+                    if prev_comment.user.login == bot_login:
+                         mentioned = True
         except: pass
     
     if not mentioned: return
