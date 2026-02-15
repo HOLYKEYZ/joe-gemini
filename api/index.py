@@ -504,7 +504,10 @@ def handle_issue_comment(payload):
     # 1. Login check
     if comment.get('user', {}).get('login') == bot_login:
         return
-    # 2. Content check (Our bot ALWAYS adds [MEMORY] blocks)
+    # 2. Type check (Ignore ALL bots, including gemini-code-assist)
+    if comment.get('user', {}).get('type') == 'Bot':
+        return
+    # 3. Content check (Our bot ALWAYS adds [MEMORY] blocks)
     if '<!-- [memory]' in body or '<!-- [memory]' in comment.get('body', ''):
         return
 
