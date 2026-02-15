@@ -33,9 +33,12 @@ def verify_signature(req):
     return hmac.compare_digest(mac.hexdigest(), signature)
 
 # Helper: Get GitHub Client for Installation
-def get_github_client(installation_id):
+def get_installation_token(installation_id):
     integration = GithubIntegration(APP_ID, PRIVATE_KEY)
-    token = integration.get_access_token(installation_id).token
+    return integration.get_access_token(installation_id).token
+
+def get_github_client(installation_id):
+    token = get_installation_token(installation_id)
     return Github(token)
 
 # Helper: Get Bot Login
@@ -129,6 +132,33 @@ def get_repo_structure(repo, path="", max_depth=1, current_depth=0):
         structure = f"Error: {e}\n"
     
     return structure
+
+def parse_diff_files(diff_text):
+    """Parse unified diff to extract changed files with their line ranges."""
+    files = []
+    current_file = None
+    current_lines = []
+    
+    for line in diff_text.split('\n'):
+        # New file in diff
+        if line.startswith('+++ b/'):
+            if current_file:
+                files.append({'path': current_file, 'lines': current_lines})
+            current_file = line[6:]  # Remove '+++ b/'
+            current_lines = []
+        # Hunk header: @@ -old,count +new,count @@
+        elif line.startswith('@@') and current_file:
+            import re as _re
+            match = _re.search(r'\+(\d+)(?:,(\d+))?', line)
+            if match:
+                start = int(match.group(1))
+                count = int(match.group(2)) if match.group(2) else 1
+                current_lines.append({'start': start, 'end': start + count - 1})
+    
+    if current_file:
+        files.append({'path': current_file, 'lines': current_lines})
+    
+    return files
 
 def read_file_content(repo, file_path):
     """Read file content from repo."""
@@ -322,19 +352,124 @@ Diff:
                 
                 expanded_context += f"\n\nFile Contents:\n{file_contents}"
         
-        # Step 2: Generate review
-        prompt = f"""You are an expert code reviewer. Review this PR.
-Identify bugs, security issues, or improvements. Be concise.
+        # Parse diff for file/line info
+        diff_files = parse_diff_files(diff_content)
+        file_line_info = ""
+        for df in diff_files:
+            ranges = ", ".join([f"L{r['start']}-{r['end']}" for r in df['lines']])
+            file_line_info += f"  {df['path']}: {ranges}\n"
+        
+        # Step 2: Generate review with committable suggestions
+        prompt = f"""You are an expert code reviewer. Review this PR and provide committable suggestions.
+
+Changed files and line ranges:
+{file_line_info}
 
 Context:
 {expanded_context}
+
+IMPORTANT: Respond ONLY with valid JSON in this exact format:
+{{
+  "summary": "Brief overall review summary (2-3 sentences max)",
+  "suggestions": [
+    {{
+      "file": "path/to/file.ext",
+      "line": 42,
+      "original": "the exact original line(s) from the diff",
+      "replacement": "your suggested replacement code",
+      "reason": "brief reason for change"
+    }}
+  ]
+}}
+
+Rules:
+- "line" must be the END line number in the new file (right side of diff)
+- "original" must be the EXACT code currently at that line
+- "replacement" is your suggested fix
+- Only suggest changes for lines that appear in the diff (changed lines)
+- Max 5 suggestions. Quality over quantity.
+- If no code changes needed, return empty suggestions array
+- Do NOT wrap in markdown code blocks, return raw JSON only
 """
-        review = query_gemini(prompt)
+        review_raw = query_gemini(prompt, temperature=0.2)
         
-        if review:
-            all_files = files_already_read + new_files_read
-            memory_block = format_memory_block({"files_read": all_files})
-            pr.create_issue_comment(f"🤖 **Automated Code Review**\n\n{review}{memory_block}")
+        all_files = files_already_read + new_files_read
+        memory_block = format_memory_block({"files_read": all_files})
+        
+        # Try to parse as structured suggestions
+        suggestions_data = None
+        if review_raw:
+            try:
+                # Try direct JSON parse first
+                suggestions_data = json.loads(review_raw)
+            except json.JSONDecodeError:
+                # Try extracting from markdown code block
+                suggestions_data = extract_json_from_response(review_raw)
+        
+        if suggestions_data and isinstance(suggestions_data, dict) and suggestions_data.get('suggestions'):
+            summary = suggestions_data.get('summary', 'Code review complete.')
+            suggestions = suggestions_data['suggestions']
+            
+            # Build inline review comments
+            review_comments = []
+            for s in suggestions[:5]:  # Max 5
+                file_path = s.get('file', '')
+                line_num = s.get('line', 0)
+                original = s.get('original', '')
+                replacement = s.get('replacement', '')
+                reason = s.get('reason', '')
+                
+                if not file_path or not line_num or not replacement:
+                    continue
+                
+                # Build committable suggestion body
+                body = f"{reason}\n\n```suggestion\n{replacement}\n```"
+                
+                review_comments.append({
+                    'path': file_path,
+                    'line': int(line_num),
+                    'body': body
+                })
+            
+            if review_comments:
+                try:
+                    # Use GitHub REST API directly for line+side support
+                    token = get_installation_token(installation['id'])
+                    api_url = f"https://api.github.com/repos/{repo_info['full_name']}/pulls/{pr_number}/reviews"
+                    review_payload = {
+                        'body': f"🤖 **Automated Code Review**\n\n{summary}{memory_block}",
+                        'event': 'COMMENT',
+                        'comments': [{
+                            'path': c['path'],
+                            'line': c['line'],
+                            'side': 'RIGHT',
+                            'body': c['body']
+                        } for c in review_comments]
+                    }
+                    api_headers = {
+                        'Authorization': f'token {token}',
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                    resp = requests.post(api_url, json=review_payload, headers=api_headers)
+                    if resp.status_code in [200, 201]:
+                        print(f"Posted review with {len(review_comments)} inline suggestions")
+                    else:
+                        print(f"Review API failed: {resp.status_code} {resp.text}")
+                        raise Exception(f"API {resp.status_code}")
+                except Exception as review_err:
+                    print(f"Review API exception: {review_err}")
+                    # Fallback: post as regular comment with suggestion blocks
+                    fallback = f"🤖 **Automated Code Review**\n\n{summary}\n\n"
+                    for s in suggestions[:5]:
+                        fallback += f"**{s.get('file', '')}** (L{s.get('line', '?')}): {s.get('reason', '')}\n"
+                        fallback += f"```suggestion\n{s.get('replacement', '')}\n```\n\n"
+                    pr.create_issue_comment(f"{fallback}{memory_block}")
+            else:
+                # No inline suggestions, just post summary
+                pr.create_issue_comment(f"🤖 **Automated Code Review**\n\n{summary}{memory_block}")
+        elif review_raw:
+            # Gemini didn't return structured JSON, post as plain review
+            pr.create_issue_comment(f"🤖 **Automated Code Review**\n\n{review_raw}{memory_block}")
             
     except Exception as e:
         import traceback
