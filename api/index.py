@@ -470,8 +470,10 @@ Files already read (from memory):
                         issue.create_comment(f"🚀 Created PR for `{branch}`")
                     except Exception as e:
                         print(f"PR Creation error: {e}")
-            else:
-                issue.create_comment(f"💡 **Thoughts:**\n{code}")
+
+            # Do NOT post 'Thoughts'. If code gen fails or is just text, it's usually duplicate of the plan.
+            # else:
+            #     issue.create_comment(f"💡 **Thoughts:**\n{code}")
     except Exception as e:
         print(f"Error processing comment: {e}")
 
