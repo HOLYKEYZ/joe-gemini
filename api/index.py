@@ -365,6 +365,14 @@ def handle_issue_comment(payload):
 
     body = comment.get('body', '').lower()
     
+    # CRITICAL SECURITY: Ignore own comments (Double Check)
+    # 1. Login check
+    if comment.get('user', {}).get('login') == bot_login:
+        return
+    # 2. Content check (Our bot ALWAYS adds [MEMORY] blocks)
+    if '<!-- [memory]' in body or '<!-- [memory]' in comment.get('body', ''):
+        return
+
     # Check mentions & replies
     mentioned = False
     if "joe-gemini" in body:
