@@ -370,14 +370,14 @@ Context:
 
 IMPORTANT: Respond ONLY with valid JSON in this exact format:
 {{
-  "summary": "Brief overall review summary (2-3 sentences max)",
+  "summary": "Technical review summary (what changed, pros/cons, any bugs/risks)",
   "suggestions": [
     {{
       "file": "path/to/file.ext",
       "line": 42,
       "original": "the exact original line(s) from the diff",
       "replacement": "your suggested replacement code",
-      "reason": "brief reason for change"
+      "reason": "Detailed technical reason for this change"
     }}
   ]
 }}
