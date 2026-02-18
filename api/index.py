@@ -360,7 +360,8 @@ Diff:
             file_line_info += f"  {df['path']}: {ranges}\n"
         
         # Step 2: Generate review with committable suggestions
-        prompt = f"""You are an expert code reviewer. Review this PR and provide committable suggestions.
+        prompt = f"""You are an expert Principal Software Engineer. 
+Perform a RIGOROUS technical review of this PR.
 
 Changed files and line ranges:
 {file_line_info}
@@ -370,26 +371,26 @@ Context:
 
 IMPORTANT: Respond ONLY with valid JSON in this exact format:
 {{
-  "summary": "Technical review summary (what changed, pros/cons, any bugs/risks)",
+  "summary": "Full technical report (Markdown). Analyze architecture, security, performance, race conditions, and error handling. Be critical and thorough.",
   "suggestions": [
     {{
       "file": "path/to/file.ext",
       "line": 42,
       "original": "the exact original line(s) from the diff",
       "replacement": "your suggested replacement code",
-      "reason": "Detailed technical reason for this change"
+      "reason": "Detailed justification (e.g. complexity reduction, security fix)"
     }}
   ]
 }}
 
 Rules:
-- "line" must be the END line number in the new file (right side of diff)
-- "original" must be the EXACT code currently at that line
-- "replacement" is your suggested fix
-- Only suggest changes for lines that appear in the diff (changed lines)
-- Max 5 suggestions. Quality over quantity.
-- If no code changes needed, return empty suggestions array
-- Do NOT wrap in markdown code blocks, return raw JSON only
+1. SUMMARY MUST BE DEEP. Not just "looks good". Analyze impact.
+2. SUGGESTIONS are OPTIONAL. Only provide if necessary/high-value.
+3. "line" must be the END line number in the new file (right side of diff)
+4. "original" must be the EXACT code currently at that line
+5. "replacement" is your suggested fix
+6. Do NOT suggest formatting/style changes unless critical.
+7. Do NOT wrap in markdown code blocks, return raw JSON only
 """
         review_raw = query_gemini(prompt, temperature=0.2)
         
