@@ -406,9 +406,9 @@ Rules:
                 # Try extracting from markdown code block
                 suggestions_data = extract_json_from_response(review_raw)
         
-        if suggestions_data and isinstance(suggestions_data, dict) and suggestions_data.get('suggestions'):
+        if suggestions_data and isinstance(suggestions_data, dict) and 'suggestions' in suggestions_data:
             summary = suggestions_data.get('summary', 'Code review complete.')
-            suggestions = suggestions_data['suggestions']
+            suggestions = suggestions_data['suggestions'] or []
             
             # Build inline review comments
             review_comments = []
