@@ -258,6 +258,7 @@ def home():
 @app.route('/api/cron', methods=['GET'])
 def cron_job():
     """Hourly autonomous improvement job."""
+    print("DEBUG: Cron triggered")
     # Security: Verify Vercel Cron header
     if request.headers.get('Authorization') != f"Bearer {os.environ.get('CRON_SECRET')}" and \
        request.headers.get('x-vercel-cron') != '1':
