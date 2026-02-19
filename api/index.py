@@ -272,7 +272,7 @@ def cron_job():
         
         # Pick the first installation (or random one)
         if start_installations.totalCount == 0:
-             return jsonify({'status': 'No installations found'}), 200
+            return jsonify({'status': 'No installations found'}), 200
              
         installation = start_installations[0] # Just grab first one for now
         gh = Github(integration.get_access_token(installation.id).token)
@@ -280,7 +280,7 @@ def cron_job():
         # Get all repos accessible
         repos = list(gh.get_installation(installation.id).get_repos())
         if not repos:
-             return jsonify({'status': 'No repos found'}), 200
+            return jsonify({'status': 'No repos found'}), 200
         
         # Pick a random repo
         import random
@@ -289,7 +289,7 @@ def cron_job():
         
         # Don't touch forked repos or archived ones unless specified (autonomy rule: focus on user's own code)
         if target_repo.fork or target_repo.archived:
-             return jsonify({'status': f'Skipped {target_repo.full_name} (fork/archived)'}), 200
+            return jsonify({'status': f'Skipped {target_repo.full_name} (fork/archived)'}), 200
 
         # Analysis Phase: Get file structure and key files
         structure = get_repo_structure(target_repo, max_depth=2)
@@ -316,7 +316,7 @@ Return only the file path in JSON: ["path/to/file.ext"]
             file_content = read_file_content(target_repo, target_path)
         
         if not file_content:
-             return jsonify({'status': 'Could not identify target file'}), 200
+            return jsonify({'status': 'Could not identify target file'}), 200
 
         # Generate Improvement
         improvement_prompt = f"""Repository: {target_repo.full_name}
@@ -360,7 +360,7 @@ Respond with strict JSON:
                 )
                 return jsonify({'status': 'PR Created', 'url': pr.html_url}), 200
             else:
-                 return jsonify({'error': 'Commit failed'}), 500
+                return jsonify({'error': 'Commit failed'}), 500
         
         return jsonify({'status': 'No improvement generated'}), 200
         
