@@ -252,9 +252,121 @@ IMPORTANT: If suggestions involve file changes, respond options:
     return query_gemini(code_prompt, context)
 
 @app.route('/', methods=['GET'])
-# ...
 def home():
     return "Joe-Gemini Vercel Bot is Active! 🚀", 200
+
+@app.route('/api/cron', methods=['GET'])
+def cron_job():
+    """Hourly autonomous improvement job."""
+    # Security: Verify Vercel Cron header
+    if request.headers.get('Authorization') != f"Bearer {os.environ.get('CRON_SECRET')}" and \
+       request.headers.get('x-vercel-cron') != '1':
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    try:
+        # Initialize GitHub client
+        # Note: We need an installation ID. For simplicity, we'll try to get the first available installation.
+        # Ideally, this should iterate all installations or be configured.
+        integration = GithubIntegration(APP_ID, PRIVATE_KEY)
+        start_installations = integration.get_installations()
+        
+        # Pick the first installation (or random one)
+        if start_installations.totalCount == 0:
+             return jsonify({'status': 'No installations found'}), 200
+             
+        installation = start_installations[0] # Just grab first one for now
+        gh = Github(integration.get_access_token(installation.id).token)
+        
+        # Get all repos accessible
+        repos = list(gh.get_installation(installation.id).get_repos())
+        if not repos:
+             return jsonify({'status': 'No repos found'}), 200
+        
+        # Pick a random repo
+        import random
+        target_repo = random.choice(repos)
+        print(f"Targeting repo: {target_repo.full_name}")
+        
+        # Don't touch forked repos or archived ones unless specified (autonomy rule: focus on user's own code)
+        if target_repo.fork or target_repo.archived:
+             return jsonify({'status': f'Skipped {target_repo.full_name} (fork/archived)'}), 200
+
+        # Analysis Phase: Get file structure and key files
+        structure = get_repo_structure(target_repo, max_depth=2)
+        readme = read_file_content(target_repo, "README.md") or ""
+        
+        # Ask Gemini for an improvement
+        prompt = f"""You are an autonomous maintainer for this repo: {target_repo.full_name}.
+Goal: Find ONE small, safe, high-value improvement.
+Codebase Structure:
+{structure}
+
+README:
+{readme[:2000]}
+
+Task: Suggest a specific file to read to find a concrete improvement (refactor, doc fix, bug fix).
+Return only the file path in JSON: ["path/to/file.ext"]
+"""
+        initial_files = get_context_expansion_files("Find improvement", prompt)
+        file_content = ""
+        target_path = ""
+        
+        if initial_files and len(initial_files) > 0:
+            target_path = initial_files[0]
+            file_content = read_file_content(target_repo, target_path)
+        
+        if not file_content:
+             return jsonify({'status': 'Could not identify target file'}), 200
+
+        # Generate Improvement
+        improvement_prompt = f"""Repository: {target_repo.full_name}
+File: {target_path}
+Content:
+{file_content}
+
+Task: Propose a meaningful, safe code improvement.
+Examples: formatting fixes, adding types, improving docstrings, fixing potential bugs.
+Do NOT break existing logic.
+
+Respond with strict JSON:
+{{
+  "title": "Short PR Title",
+  "body": "Detailed PR description explaining the change.",
+  "branch_name": "bot/improvement-{int(time.time())}",
+  "files": {{
+      "{target_path}": "FULL NEW CONTENT OF THE FILE"
+  }}
+}}
+"""
+        raw_response = query_gemini(improvement_prompt, temperature=0.2)
+        improvement_data = extract_json_from_response(raw_response)
+        
+        if improvement_data and 'files' in improvement_data:
+            # Create Branch & PR
+            branch = improvement_data.get('branch_name', f'bot/fix-{int(time.time())}')
+            title = improvement_data.get('title', 'Automated improvement')
+            body = improvement_data.get('body', 'Automated changes by Joe-Gemini.')
+            
+            # Commit
+            success = commit_changes_via_api(target_repo, branch, improvement_data['files'], title)
+            
+            if success:
+                # Open PR
+                pr = target_repo.create_pull(
+                    title=title,
+                    body=f"{body}\n\nGenerated autonomously by Joe-Gemini 🤖",
+                    head=branch,
+                    base=target_repo.default_branch
+                )
+                return jsonify({'status': 'PR Created', 'url': pr.html_url}), 200
+            else:
+                 return jsonify({'error': 'Commit failed'}), 500
+        
+        return jsonify({'status': 'No improvement generated'}), 200
+        
+    except Exception as e:
+        print(f"Cron error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
