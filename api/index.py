@@ -375,12 +375,21 @@ def cron_job():
             success = commit_changes_via_api(target_repo, branch, improvement_data['files'], title)
             
             if success:
+                owner_login = target_repo.owner.login
                 pr = target_repo.create_pull(
                     title=title,
-                    body=f"{body}\n\nGenerated autonomously by Joe-Gemini 🤖",
+                    body=f"Hey @{owner_login}! Joseph, I've found an improvement for you.\n\n{body}\n\nGenerated autonomously by Joe-Gemini 🤖",
                     head=branch,
                     base=target_repo.default_branch
                 )
+                
+                # Assign owner and request review
+                try:
+                    pr.add_to_assignees(owner_login)
+                    pr.create_review_request(reviewers=[owner_login])
+                except Exception as e:
+                    print(f"DEBUG: Failed to assign/request review: {e}")
+
                 print(f"DEBUG: PR created: {pr.html_url}")
                 return jsonify({'status': 'PR Created', 'url': pr.html_url}), 200
             else:
