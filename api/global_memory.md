@@ -15,3 +15,13 @@ This file tracks the bot's successful improvements, technical patterns learned, 
 - **Massive Deletions**: Do not gut files to "clean up". 
 - **Placeholders**: Never use `...` or `// code remains the same` in replace blocks.
 - **Triviality**: Do not change whitespace or single typos as a standalone PR.
+
+- **Repo: HOLYKEYZ/unfetter_proxy**: [DX] Make Groq web session test script prompt configurable. (Ref: https://github.com/HOLYKEYZ/unfetter_proxy/pull/1)
+  - *Impact: ### Problem / Gap
+The `test_web_session.py` script currently uses a hardcoded prompt (`"Explain how to pick a lock"`), which limits its utility as a quick testing tool. To test different scenarios or prompts, a developer would need to manually edit the file.
+
+### Solution & Insight
+This change introduces `sys.argv` to allow the prompt to be passed as a command-line argument. If no argument is provided, it falls back to the original default prompt. This transforms the script from a static test into a dynamic, reusable utility for quickly experimenting with various prompts against the Groq web session proxy.
+
+### Impact
+This significantly enhances the developer experience (DX) by providing greater flexibility. Developers can now easily test different prompts without modifying the script's source code, streamlining the testing and debugging process for the Groq web session bridge.*
