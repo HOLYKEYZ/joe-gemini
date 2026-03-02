@@ -25,3 +25,12 @@ This change introduces `sys.argv` to allow the prompt to be passed as a command-
 
 ### Impact
 This significantly enhances the developer experience (DX) by providing greater flexibility. Developers can now easily test different prompts without modifying the script's source code, streamlining the testing and debugging process for the Groq web session bridge.*
+- **Repo: HOLYKEYZ/joe-gemini**: [LOGIC] Complete parse_diff_files for accurate diff analysis. (Ref: https://github.com/HOLYKEYZ/joe-gemini/pull/4)
+  - *Impact: ### Problem / Gap
+The `parse_diff_files` function in `api/index.py` is incomplete, abruptly ending mid-function. This critical omission prevents the bot from correctly parsing unified diffs, which is fundamental to its ability to identify and analyze changes in a repository. Without this, the bot cannot effectively perform "surgical precision" edits or conduct "architect-level reasoning" based on code modifications.
+
+### Solution & Insight
+This change completes the `parse_diff_files` function. It now accurately extracts the paths of changed files and the line numbers within the *new* version of those files that correspond to additions or modifications. The logic correctly tracks line numbers across diff hunks and identifies lines marked with `+` as changed lines, ensuring that the bot can precisely pinpoint the relevant code sections for analysis. The `new_line_num` variable is correctly initialized at the start of the function and reset for each new file and hunk to maintain accurate line tracking.
+
+### Impact
+This fix is paramount for the bot's core functionality. It enables Joe-Gemini to correctly interpret code changes, allowing it to apply its "surgical precision" and "architect-level reasoning" to the right parts of the codebase. This directly enhances the bot's reliability, accuracy, and overall effectiveness as an autonomous maintainer.*
