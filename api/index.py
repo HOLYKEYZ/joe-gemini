@@ -228,7 +228,7 @@ def apply_surgical_edits(content, edits):
 
 def query_gemini(prompt, context="", temperature=0.4):
     headers = {'Content-Type': 'application/json'}
-    final_prompt = f"""You are an autonomous GitHub bot called @joe-gemini.
+    final_prompt = f"""You are an autonomous GitHub bot called @mayo.
 Context: {context}
 Request: {prompt}
 Instructions:
@@ -361,14 +361,26 @@ def audit_pending_reviews(gh):
             except Exception as e:
                 print(f"DEBUG: Failed to audit PR {pr_url}: {e}")
         
+        # Memory Decay: Keep only the 30 most recent entries. Archive older ones.
+        mem_lines = updated_memory.split('\n')
+        repo_entries = [i for i, line in enumerate(mem_lines) if line.startswith('- **Repo:')]
+        
+        if len(repo_entries) > 30:
+            cutoff_idx = repo_entries[-30]
+            header = mem_lines[0]
+            archived_count = len(repo_entries) - 30
+            summary_msg = f"\n- *[ARCHIVED] {archived_count} older lessons were archived to preserve focus.*"
+            new_lines = [header, summary_msg] + mem_lines[cutoff_idx:]
+            updated_memory = '\n'.join(new_lines)
+
         if updated_memory != memory:
             bot_repo.update_file(
                 "api/global_memory.md",
-                "feat(memory): audit pending reviews",
+                "feat(memory): audit pending reviews and decay memory",
                 updated_memory,
                 memory_file.sha
             )
-            print("DEBUG: Memory updated with review audits")
+            print("DEBUG: Memory updated with review audits and decay")
     except Exception as e:
         print(f"DEBUG: Failed to audit pending reviews: {e}")
 
@@ -405,7 +417,40 @@ def update_ai_communication_log(gh, ts, scanner_summary, executor_proposal, revi
 
 @app.route('/', methods=['GET'])
 def home():
-    return "Joe-Gemini Vercel Bot is Active! 🚀", 200
+    return "Mayo Vercel Bot is Active! 🚀", 200
+@app.route('/status', methods=['GET'])
+def get_status():
+    """Simple dashboard endpoint to check Mayo's health and memory."""
+    try:
+        integration = GithubIntegration(APP_ID, PRIVATE_KEY)
+        installations = integration.get_installations()
+        if not installations or installations.totalCount == 0:
+            return jsonify({'error': 'No installations found'})
+            
+        token = integration.get_access_token(installations[0].id).token
+        gh = Github(token)
+        bot_repo = gh.get_repo("HOLYKEYZ/joe-gemini")
+        
+        # Get memory length
+        mem_file = bot_repo.get_contents("api/global_memory.md")
+        mem_content = mem_file.decoded_content.decode('utf-8')
+        mem_lines = len(mem_content.split('\n'))
+        
+        # Get comms length
+        comms_file = bot_repo.get_contents("api/ai_communication.md")
+        comms_content = comms_file.decoded_content.decode('utf-8')
+        cycles = len(comms_content.split('## Cycle ')) - 1
+        
+        return jsonify({
+            'status': 'Online',
+            'bot_name': 'Mayo 🤖',
+            'memory_lines': mem_lines,
+            'recent_cycles_logged': cycles,
+            'uptime_seconds': int(time.time()),
+            'excluded_repos': ['Square-farms', 'Jo-ayanda-real-estate', 'Backend-images-app', 'ecom-stor']
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/cron', methods=['GET'])
 def cron_job():
@@ -446,19 +491,7 @@ def cron_job():
         if not repo_names:
             return jsonify({'status': 'No repos found'}), 200
         
-        # Pick a random repo (skip forks/archived)
-        import random
-        repo_list = [r for r in repos_data.get('repositories', []) if not r.get('fork') and not r.get('archived')]
-        
-        if not repo_list:
-            return jsonify({'status': 'All repos are forks/archived'}), 200
-        
-        random.shuffle(repo_list)
-        chosen = repo_list[0]
-        target_repo = gh.get_repo(chosen['full_name'])
-        print(f"DEBUG: Targeting repo: {target_repo.full_name}")
-
-        # Fetch Global Memory
+        # Fetch Global Memory first for priority/cooldown analysis
         try:
             bot_repo = gh.get_repo("HOLYKEYZ/joe-gemini")
             memory_file_obj = bot_repo.get_contents("api/global_memory.md")
@@ -467,6 +500,47 @@ def cron_job():
         except Exception as e:
             print(f"DEBUG: Failed to fetch global memory: {e}")
             global_memory = "No global memory found. Start with fresh excellence."
+
+        # === REPO SELECTION: Exclusions, Cooldown, Priority ===
+        EXCLUDED_REPOS = ['Square-farms', 'Jo-ayanda-real-estate', 'Backend-images-app', 'ecom-stor']
+        
+        candidates = [r for r in repos_data.get('repositories', []) 
+                      if not r.get('fork') and not r.get('archived') 
+                      and r.get('name') not in EXCLUDED_REPOS]
+        
+        if not candidates:
+            return jsonify({'status': 'No eligible repos found'}), 200
+            
+        # Parse last 3 repos from memory for cooldown
+        recent_repos = []
+        import re as re_mod
+        for line in reversed(global_memory.split('\n')):
+            match = re_mod.search(r'\*\*Repo: ([^\*]+)\*\*', line)
+            if match:
+                r_name = match.group(1).strip()
+                if r_name not in recent_repos:
+                    recent_repos.append(r_name)
+                if len(recent_repos) >= 3:
+                    break
+                    
+        # Filter out cooldown repos
+        available = [r for r in candidates if r.get('name') not in recent_repos]
+        if not available:
+            print("DEBUG: All candidates in cooldown. Ignoring cooldown.")
+            available = candidates
+            
+        # Priority Queue: rank by oldest occurrence in memory
+        def repo_score(repo):
+            return global_memory.rfind(f"**Repo: {repo.get('name')}**")
+            
+        available.sort(key=repo_score)
+        
+        # Pick randomly from the top 30% most-needing repos
+        import random
+        top_k = max(1, len(available) // 3)
+        chosen = random.choice(available[:top_k])
+        target_repo = gh.get_repo(chosen['full_name'])
+        print(f"DEBUG: Targeting repo {target_repo.full_name} (cooldown/priority applied)")
 
         # Gather codebase context
         structure = get_repo_structure(target_repo, max_depth=2)
@@ -496,31 +570,40 @@ def cron_job():
             else:
                 return jsonify({'status': 'No source files found'}), 200
         
-        target_path = random.choice(source_files)
-        file_content = read_file_content(target_repo, target_path)
+        # Multi-file support: Pick up to 3 files
+        import random
+        random.shuffle(source_files)
+        target_paths = [sf.path if hasattr(sf, 'path') else sf for sf in source_files[:3]]
         
-        if not file_content:
-            print(f"DEBUG: Could not read target file: {target_path}")
-            return jsonify({'status': 'Could not identify target file'}), 200
+        file_contents = ""
+        for tp in target_paths:
+            content = read_file_content(target_repo, tp)
+            if content:
+                file_contents += f"\n--- {tp} ---\n{content}\n"
+        
+        if not file_contents:
+            print("DEBUG: Could not read target files")
+            return jsonify({'status': 'Could not identify target files'}), 200
 
         ts = int(time.time())
+        target_path_display = ", ".join(target_paths)
 
         # === PHASE 1: SCANNER (Gemini A) ===
-        print(f"DEBUG: Phase 1 — Scanner analyzing {target_path}")
+        print(f"DEBUG: Phase 1 — Scanner analyzing {target_path_display}")
         try:
             scanner_path = os.path.join(os.path.dirname(__file__), 'scanner_prompt.txt')
             with open(scanner_path, 'r') as f:
                 scanner_template = f.read()
             
             scanner_prompt = scanner_template.replace('{{REPO_NAME}}', target_repo.full_name)\
-                                             .replace('{{FILE_PATH}}', target_path)\
+                                             .replace('{{FILE_PATH}}', target_path_display)\
                                              .replace('{{REPO_STRUCTURE}}', structure)\
                                              .replace('{{README_CONTENT}}', readme_content)\
-                                             .replace('{{FILE_CONTENT}}', file_content)\
+                                             .replace('{{FILE_CONTENT}}', file_contents)\
                                              .replace('{{GLOBAL_MEMORY}}', global_memory)
         except Exception as e:
             print(f"DEBUG: Failed to load scanner prompt: {e}")
-            scanner_prompt = f"Analyze {target_repo.full_name}/{target_path} and recommend one improvement. Text only, no code."
+            scanner_prompt = f"Analyze {target_repo.full_name} ({target_path_display}) and recommend one improvement. Text only, no code."
         
         scanner_plan = query_gemini_scanner(scanner_prompt)
         if not scanner_plan:
@@ -548,12 +631,13 @@ def cron_job():
                     executor_template = f.read()
                 
                 executor_prompt = executor_template.replace('{{REPO_NAME}}', target_repo.full_name)\
-                                                   .replace('{{FILE_PATH}}', target_path)\
+                                                   .replace('{{FILE_PATH}}', target_path_display)\
+                                                   .replace('{{REPO_STRUCTURE}}', structure)\
                                                    .replace('{{SCANNER_PLAN}}', scanner_plan)\
-                                                   .replace('{{FILE_CONTENT}}', file_content)\
+                                                   .replace('{{FILE_CONTENT}}', file_contents)\
                                                    .replace('{{GLOBAL_MEMORY}}', global_memory)\
                                                    .replace('{{TIMESTAMP}}', str(ts))\
-                                                   .replace('{{REVIEWER_FEEDBACK}}', reviewer_feedback)
+                                                   .replace('{{FEEDBACK}}', reviewer_feedback)
             except Exception as e:
                 print(f"DEBUG: Failed to load executor prompt: {e}")
                 break
@@ -653,23 +737,38 @@ def cron_job():
             print("DEBUG: No valid edits after pipeline")
             return jsonify({'status': 'No improvement generated'}), 200
 
-        # Apply the approved/corrected edits
-        new_file_content = apply_surgical_edits(file_content, final_edits)
+        # Group edits by file
+        file_edits = {}
+        for edit in final_edits:
+            # Fallback to the first target path if the AI forgot the file field
+            fpath = edit.get('file') or target_paths[0]
+            if fpath not in file_edits:
+                file_edits[fpath] = []
+            file_edits[fpath].append(edit)
+            
+        file_changes = {}
+        for fpath, edits in file_edits.items():
+            content = read_file_content(target_repo, fpath)
+            if not content:
+                print(f"DEBUG: Could not read {fpath} for edits")
+                continue
+            new_content = apply_surgical_edits(content, edits)
+            if new_content != content:
+                file_changes[fpath] = new_content
         
-        if new_file_content == file_content:
-            print("DEBUG: No changes applied after surgical edits")
+        if not file_changes:
+            print("DEBUG: No changes applied after surgical edits (search failed or no valid files)")
             return jsonify({'status': 'No changes applied'}), 200
 
         # Create PR
-        file_changes = {target_path: new_file_content}
-        print(f"DEBUG: Creating branch {final_branch} with validated edits for {target_path}")
+        print(f"DEBUG: Creating branch {final_branch} with validated edits for {list(file_changes.keys())}")
         success = commit_changes_via_api(target_repo, final_branch, file_changes, final_title)
         
         if success:
             owner_login = target_repo.owner.login
             pr = target_repo.create_pull(
                 title=f"[VALIDATED] {final_title}",
-                body=f"Hey @{owner_login}! Joseph, I've found an improvement for you.\n\n{final_body}\n\n---\n*Validated by Triple-AI: Scanner (Gemini) → Executor (Kimi K2) → Reviewer (Gemini)*\n\nGenerated autonomously by Joe-Gemini 🤖",
+                body=f"Hey @{owner_login}! Joseph, I've found an improvement for you.\n\n{final_body}\n\n---\n*Validated by Triple-AI: Scanner (Gemini) → Executor (Kimi K2) → Reviewer (Gemini)*\n\nGenerated autonomously by Mayo 🤖",
                 head=final_branch,
                 base=target_repo.default_branch
             )
@@ -1023,7 +1122,7 @@ def handle_issue_comment(payload):
 
     # Check mentions & replies
     mentioned = False
-    if "joe-gemini" in body:
+    if "mayo" in body.lower() or "joe-gemini" in body.lower():
         # Only set mentioned=True if it's NOT the bot talking to itself
         mentioned = True
     else:
@@ -1094,34 +1193,93 @@ Files already read (from memory):
                 
                 expanded_context += f"\n\nFile Contents:\n{file_contents}"
         
-        # 5. Generate response
-        plan = query_gemini(f"User Request: {comment['body']}\n\nRespond using the context provided.", expanded_context)
+        # 5. Generate response (Reviewer)
+        reviewer_prompt = f"""You are Mayo, the Senior Quality Assurance & Reviewer AI.
+Joseph (the human owner) has made a comment: "{comment['body']}"
+
+Context:
+{expanded_context}
+
+Instructions:
+1. Address Joseph's comment clearly and concisely.
+2. If Joseph is providing feedback, rejecting something, or explaining a preferred pattern, state clearly how you understand his instruction.
+3. If Joseph's request requires code changes, explain the technical plan for the fix and end your ENTIRE response with the exact marker: [REQUIRES_EXECUTION]
+"""
+        plan = query_gemini_reviewer(reviewer_prompt)
         if not plan: return
         
         all_files = files_already_read + new_files_read
         memory_block = format_memory_block({"files_read": all_files})
         
-        issue.create_comment(f"🤖 **Response:**\n{plan}{memory_block}")
+        issue.create_comment(f"🛡️ **Reviewer (Mayo):**\n{plan}{memory_block}")
         
-        # 6. Code changes?
-        if any(k in body for k in ['fix', 'code', 'implement', 'change']):
-            code = query_gemini_for_code(f"Generate code for: {plan}", expanded_context)
-            parsed = extract_json_from_response(code)
+        # 6. Execute Code Changes (Executor)
+        if "[REQUIRES_EXECUTION]" in plan:
+            issue.create_comment("⚡ *Executor (Kimi K2) is now writing the code changes...*")
             
-            if parsed and 'files' in parsed:
-                branch = f"joe-gemini/fix-{issue_number}-{int(time.time())}"
-                if commit_changes_via_api(repo, branch, parsed['files'], f"Fix: {parsed.get('explanation', 'Automated fix')}"):
-                    msg = f"✅ Committed to branch `{branch}`.\n\nChanges: {parsed.get('explanation')}"
-                    issue.create_comment(msg)
-                    try:
-                        repo.create_pull(title=f"Fix for #{issue_number}", body=f"Automated fix.\n{parsed.get('explanation')}", head=branch, base=repo.default_branch)
-                        issue.create_comment(f"🚀 Created PR for `{branch}`")
-                    except Exception as e:
-                        print(f"PR Creation error: {e}")
+            executor_prompt = f"""You are Mayo, the Executor AI (Code Engineer).
+The Reviewer AI has established this plan based on Joseph's feedback:
+{plan}
 
-            # Do NOT post 'Thoughts'. If code gen fails or is just text, it's usually duplicate of the plan.
-            # else:
-            #     issue.create_comment(f"💡 **Thoughts:**\n{code}")
+Based on this plan, look at the files provided in the context below:
+{expanded_context}
+
+Generate the exact surgical search/replace JSON edits needed to fulfill this fix.
+IMPORTANT RULES:
+1. MAX 10 lines per search block.
+2. Return strict JSON.
+3. Include the "file" field in each edit block so I know which file to modify!
+"""
+            code_response = query_groq(executor_prompt)
+            parsed = extract_json_from_response(code_response)
+            
+            if parsed and 'edits' in parsed:
+                # Group edits by file
+                file_edits = {}
+                for edit in parsed['edits']:
+                    fpath = edit.get('file')
+                    if not fpath: continue
+                    if fpath not in file_edits:
+                        file_edits[fpath] = []
+                    file_edits[fpath].append(edit)
+                
+                # Apply edits
+                file_changes = {}
+                for fpath, edits in file_edits.items():
+                    content = read_file_content(repo, fpath)
+                    if not content: continue
+                    new_content = apply_surgical_edits(content, edits)
+                    if new_content != content:
+                        file_changes[fpath] = new_content
+                
+                if file_changes:
+                    # Decide branch
+                    if issue.pull_request:
+                        try:
+                            pr = repo.get_pull(issue_number)
+                            branch = pr.head.ref
+                        except:
+                            branch = f"mayo/fix-{issue_number}-{int(time.time())}"
+                    else:
+                        branch = f"mayo/fix-{issue_number}-{int(time.time())}"
+                    
+                    commit_title = parsed.get('title', f"Fix: Addressed feedback in #{issue_number}")
+                    if commit_changes_via_api(repo, branch, file_changes, commit_title):
+                        msg = f"✅ Committed changes to `{branch}`.\n\nDescription: {parsed.get('body', commit_title)}"
+                        issue.create_comment(msg)
+                        
+                        if not issue.pull_request:
+                            try:
+                                repo.create_pull(title=commit_title, body=f"Automated fix.\n{parsed.get('body', '')}", head=branch, base=repo.default_branch)
+                                issue.create_comment(f"🚀 Created new PR for `{branch}`")
+                            except Exception as e:
+                                print(f"PR Creation error: {e}")
+                    else:
+                        issue.create_comment("⚠️ Executor generated edits, but the commit failed. Check logs.")
+                else:
+                    issue.create_comment("⚠️ Executor generated edits, but they did not match the file contents (search blocks failed).")
+            else:
+                 issue.create_comment("⚠️ Executor failed to generate valid JSON edits.")
     except Exception as e:
         print(f"Error processing comment: {e}")
 

@@ -11,6 +11,6 @@ jobs:
     steps:
       - name: Call Vercel Cron Endpoint
         run: |
-          curl -X GET "${{ secrets.VERCEL_APP_URL }}/api/cron" \
+          curl --max-time 120 -X GET "${{ secrets.VERCEL_APP_URL }}/api/cron" \
           -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
           -H "Content-Type: application/json"

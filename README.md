@@ -1,7 +1,7 @@
-# Joe-Gemini 🦾🤖
+# Mayo 🦾🤖
 ### The Autonomous Triple-AI Maintainer
 
-Joe-Gemini is a **Self-Improving Autonomous Maintenance Engine** integrated directly into your GitHub ecosystem. It uses a **Triple-AI Pipeline** — three specialized AI models working in concert — to produce high-value, validated code improvements across all your repositories.
+Mayo is a **Self-Improving Autonomous Maintenance Engine** integrated directly into your GitHub ecosystem. It uses a **Triple-AI Pipeline** — three specialized AI models working in concert — to produce high-value, validated code improvements across all your repositories.
 
 ---
 
@@ -35,7 +35,7 @@ flowchart TD
 
 ## 🧠 Cross-Repo Global Memory
 
-Unlike standard AI bots, Joe-Gemini has **persistent memory**:
+Unlike standard AI bots, Mayo has **persistent memory**:
 - Tracks successes, failures, and "lessons learned" across all repositories.
 - Insights from Repo A directly improve work on Repo B.
 - The Reviewer audits real PR states (merged/closed/commented) and updates memory automatically.

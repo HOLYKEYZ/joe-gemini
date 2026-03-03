@@ -49,5 +49,4 @@ Provide a precise, actionable instruction for the Executor AI:
 - **HOW** to do it (step-by-step logic, NOT code)
 - **CONSTRAINT**: Tell the Executor to keep each search block under 10 lines
 
-## OUTPUT FORMAT
 Return your analysis as structured text with clear headers. NO JSON. NO code blocks. Text only.

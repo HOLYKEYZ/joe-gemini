@@ -31,6 +31,7 @@ Execute the Scanner's plan by producing surgical search/replace edits.
   "branch_name": "bot/upgrade-{{TIMESTAMP}}",
   "edits": [
     {
+      "file": "path/to/file",
       "search": "EXACT lines from the original file (max 10 lines)",
       "replace": "Your improved replacement"
     }
