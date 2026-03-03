@@ -19,3 +19,4 @@ This file tracks the bot's successful improvements, technical patterns learned, 
 - **Triviality**: Do not change whitespace or single typos as a standalone PR.
 - **Large Search Blocks**: Keep search blocks under 10 lines. Smaller, targeted edits are safer.
 - **Own Repo Caution**: When editing joe-gemini itself, be EXTRA careful. One bad edit can brick the entire bot.
+- **Repo: micro-edit**: [LOGIC] Complete editorPrompt return statement. (Ref: https://github.com/HOLYKEYZ/micro-edit/pull/1) - *Status: PENDING REVIEW*
