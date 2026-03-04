@@ -11,24 +11,24 @@ Every improvement goes through 3 AI models before it becomes a PR:
 
 ```mermaid
 flowchart TD
-    A["⏰ Hourly Cron Trigger"] --> R0["🛡️ REVIEWER: Audit pending PR statuses"]
-    R0 --> B["🔭 SCANNER: Deep codebase analysis"]
-    B -->|"Text-only summary + plan"| C["⚡ EXECUTOR: Generate surgical edits"]
-    C -->|"Proposed search/replace JSON"| D["🛡️ REVIEWER: Validate edits"]
-    D -->|"✅ APPROVE"| E["📦 Create PR"]
-    D -->|"🔧 CORRECT"| F["Apply corrected edits → Create PR"]
-    D -->|"❌ REJECT + feedback"| C2["⚡ EXECUTOR: Retry with feedback"]
-    C2 --> D2["🛡️ REVIEWER: Validate retry"]
-    D2 -->|"✅ APPROVE"| E
-    D2 -->|"❌ REJECT"| SKIP["⏭️ Skip, save failure to memory"]
-    E --> MEM["🧠 All 3 AIs save lessons to Global Memory"]
+    A["Hourly Cron Trigger"] --> R0["REVIEWER: Audit pending PR statuses"]
+    R0 --> B["SCANNER: Deep codebase analysis"]
+    B -->|"Text-only summary + plan"| C["EXECUTOR: Generate surgical edits"]
+    C -->|"Proposed search/replace JSON"| D["REVIEWER: Validate edits"]
+    D -->|"APPROVE"| E["Create PR"]
+    D -->|"CORRECT"| F["Apply corrected edits then Create PR"]
+    D -->|"REJECT + feedback"| C2["EXECUTOR: Retry with feedback"]
+    C2 --> D2["REVIEWER: Validate retry"]
+    D2 -->|"APPROVE"| E
+    D2 -->|"REJECT"| SKIP["Skip, save failure to memory"]
+    E --> MEM["All 3 AIs save lessons to Global Memory"]
     F --> MEM
 ```
 
 | Role | Model | Purpose |
 |---|---|---|
 | 🔭 **Scanner** | Gemini 2.5 Flash | Reads full codebase → text-only analysis (zero compaction risk) |
-| ⚡ **Executor** | Kimi K2 (Groq) | Receives plan → produces surgical search/replace edits |
+| ⚡ **Executor** | Llama 3.3 70B (Groq) | Receives plan → produces surgical search/replace edits |
 | 🛡️ **Reviewer** | Gemini 2.5 Flash | Validates edits, corrects mistakes, audits PR review history |
 
 ---
@@ -70,7 +70,7 @@ The Scanner performs a rigorous multi-layered analysis:
 |---|---|
 | `GEMINI_API_KEY` | Scanner (Gemini A) |
 | `GEMINI2_API_KEY` | Reviewer (Gemini B) |
-| `GROK_API_KEY` | Executor (Kimi K2 via Groq) |
+| `GROK_API_KEY` | Executor (Llama 3.3 70B via Groq) |
 | `APP_ID` / `PRIVATE_KEY` | GitHub App authentication |
 | `CRON_SECRET` | Hourly trigger authorization |
 
