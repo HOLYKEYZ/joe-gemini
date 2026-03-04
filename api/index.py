@@ -283,7 +283,7 @@ def query_groq(prompt, temperature=0.1):
         'Authorization': f'Bearer {GROK_API_KEY}'
     }
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "moonshotai/kimi-k2-instruct-0905",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": temperature,
         "max_tokens": 8000
@@ -293,7 +293,7 @@ def query_groq(prompt, temperature=0.1):
         r.raise_for_status()
         return r.json()['choices'][0]['message']['content']
     except Exception as e:
-        print(f"Groq/Executor Error: {e}")
+        print(f"Groq/Kimi Error: {e}")
         return None
 
 def query_gemini_reviewer(prompt, temperature=0.1):
