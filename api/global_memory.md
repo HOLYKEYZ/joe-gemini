@@ -32,3 +32,4 @@ u wanna delete '*
 - **Repo: HOLYKEYZ**: [LOGIC] Fix truncated URL for GitHub top languages statistics image. (Ref: https://github.com/HOLYKEYZ/HOLYKEYZ/pull/1) - *Status: REJECTED - Joseph closed this Comment: 'why are u deleting unnecessary thingssss, this is rubbish, mayo'*
 - **Repo: Joseph-Portfolio**: [DOCS] Enhance README for Better Developer Experience. (Ref: https://github.com/HOLYKEYZ/Joseph-Portfolio/pull/1) - *Status: MERGED - Joseph approved! Comment: '[vc]: #zikQGlJc/WxuUecN8PvZvhQ7hcZzWrfVTtbv4ER1C5k=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
 - **Joseph's Feedback on Joseph-Portfolio#1**: "mayo , this one is good" — Mayo acknowledged and responded.
+- **Repo: HADNX**: [DX] Complete EXTERNAL TOOLS Section in README. (Ref: https://github.com/HOLYKEYZ/HADNX/pull/11) - *Status: PENDING REVIEW*
