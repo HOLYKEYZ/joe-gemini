@@ -277,23 +277,23 @@ def query_gemini_scanner(prompt, temperature=0.2):
         return None
 
 def query_groq(prompt, temperature=0.1):
-    """Executor AI (Kimi K2) — produces surgical code edits via Groq."""
+    """Executor AI (Llama 3.3 70B) — produces surgical code edits via Groq."""
     headers = {
         'Content-Type': 'application/json',
         'Authorization': f'Bearer {GROK_API_KEY}'
     }
     payload = {
-        "model": "moonshotai/kimi-k2-instruct-0905",
+        "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": temperature,
-        "max_tokens": 8000
+        "max_tokens": 4096
     }
     try:
         r = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=25)
         r.raise_for_status()
         return r.json()['choices'][0]['message']['content']
     except Exception as e:
-        print(f"Groq/Kimi Error: {e}")
+        print(f"Groq/Llama Error: {e}")
         return None
 
 def query_gemini_reviewer(prompt, temperature=0.1):
