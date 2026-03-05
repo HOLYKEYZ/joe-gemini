@@ -237,6 +237,7 @@ def apply_surgical_edits(content, edits):
         replace_text = replace if replace else ""
         
         # Find the search block in content using LINE-BY-LINE matching
+        # Pass 1: Strict match (rstrip only)
         match_start = -1
         for i in range(len(content_lines) - len(search_lines) + 1):
             matched = True
@@ -248,6 +249,20 @@ def apply_surgical_edits(content, edits):
             if matched:
                 match_start = i
                 break
+        
+        # Pass 2: Fuzzy match (strip ALL whitespace) — handles indentation mismatches from LLMs
+        if match_start == -1:
+            for i in range(len(content_lines) - len(search_lines) + 1):
+                matched = True
+                for j, search_line in enumerate(search_lines):
+                    content_line = content_lines[i + j].rstrip('\r\n')
+                    if content_line.strip() != search_line.strip():
+                        matched = False
+                        break
+                if matched:
+                    match_start = i
+                    print(f"DEBUG: Fuzzy-matched search block at line {i+1} (whitespace-tolerant)")
+                    break
         
         if match_start == -1:
             print(f"DEBUG: Search block not found (line-match): {search[:50]}...")
