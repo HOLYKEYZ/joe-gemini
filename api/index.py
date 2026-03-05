@@ -785,7 +785,24 @@ def cron_job():
                 final_branch = improvement_data.get('branch_name', f'bot/fix-{ts}')
                 break
             elif verdict == 'CORRECT':
-                final_edits = reviewer_data.get('corrected_edits', improvement_data.get('edits', []))
+                corrected = reviewer_data.get('corrected_edits', improvement_data.get('edits', []))
+                
+                # Verify the Reviewer's corrections actually work and pass safety guards
+                valid_corrections = False
+                for edit in corrected:
+                    fpath = edit.get('file') or target_paths[0]
+                    original = read_file_content(target_repo, fpath) or ""
+                    if apply_surgical_edits(original, [edit]) != original:
+                        valid_corrections = True
+                        break
+                
+                if not valid_corrections:
+                    print("DEBUG: Reviewer's corrected edits failed safety guards or found no matches. Aborting.")
+                    final_edits = []  # Clear edits so no PR is made
+                    reviewer_verdict_text = "CORRECT (but corrected edits failed safety checks)"
+                    break
+                
+                final_edits = corrected
                 final_title = improvement_data.get('title', 'Automated improvement')
                 final_body = improvement_data.get('body', '')
                 final_branch = improvement_data.get('branch_name', f'bot/fix-{ts}')
