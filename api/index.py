@@ -194,8 +194,13 @@ def extract_json_from_response(text):
 
 def commit_changes_via_api(repo, branch_name, file_changes, commit_message):
     try:
-        sb = repo.get_branch(repo.default_branch)
-        repo.create_git_ref(ref=f"refs/heads/{branch_name}", sha=sb.commit.sha)
+        try:
+            repo.get_branch(branch_name)
+        except Exception:
+            # Branch doesn't exist, create it from default branch
+            sb = repo.get_branch(repo.default_branch)
+            repo.create_git_ref(ref=f"refs/heads/{branch_name}", sha=sb.commit.sha)
+            
         for path, content in file_changes.items():
             try:
                 contents = repo.get_contents(path, ref=branch_name)
