@@ -466,3 +466,83 @@ This is a precise, targeted modification within a single file (`package.json`) t
 **Reviewer**: REJECTED x2: The proposed edits, despite appearing to have correct search blocks, are not resulting in any changes according to the 'ACTUAL DIFF PREVIEW'. Please investigate why the search blocks are not matching for the system that generates the diff, and resubmit with edits that will actually apply the intended changes. Ensure the search strings are absolutely identical to the target lines, including any leading/trailing whitespace or characters.
 
 ---
+
+## Cycle 1772750099
+**Scanner**: ## SCANNER ANALYSIS: HOLYKEYZ/temple-sysinfo
+
+### Step 1: Codebase Understanding
+
+This repository provides a command-line utility for Windows that gathers and displays various system information, such as OS details, CPU, memory, disk usage, uptime, processes, power status, and display settings. It also includes a demonstration of HolyC syntax as a tribute to TempleOS.
+
+The `sysinfo.c` file is the core C source code for the Windows system information utility. It implements all the functions responsible for querying the operating system for specific details and formatting them for console output.
+
+The codebase primarily uses standard C libraries and extensive Windows API calls to retrieve system information. It follows a modular approach, with each category of system information (e.g., CPU, Memory, Disk) handled by a dedicated function. Output formatting is consistent across modules, utilizing custom header and footer functions. The code uses ANSI versions of Windows API functions (suffixed with 'A').
+
+### Step 2: Deep Analysis
+
+**Security:**
+*   **Buffer Overflows**: The code uses fixed-size buffers for strings (e.g., `computer_name[256]`, `truncated[30]`). While `strncpy` and size parameters are generally used, the `print_env_vars` function's truncation logic for environment variables, specifically `strncpy(truncated, val, 25); truncated[25] = '\0'; strcat(truncated, "...");`, is correctly handled for the `truncated[30]` buffer size, ensuring no overflow. Similarly, `strncpy(name, pe.szExeFile, 28); name[28] = '\0';` in `print_process_list` is safe for `name[30]`.
+*   **Environment Variables**: Displaying environment variables like `PATH` is part of a system info tool's function and not a security flaw in itself, though it could reveal paths. No direct injection vulnerabilities are present as no external input is used to construct commands.
+
+**Logic:**
+*   **Memory Information (Deprecated API)**: The `print_memory_info` function uses `MEMORYSTATUS` and `GlobalMemoryStatus`. This API is deprecated and can only report up to 4GB of physical memory. On systems with more than 4GB RAM, it will incorrectly cap the reported total and available physical memory, leading to inaccurate information. `MEMORYSTATUSEX` and `GlobalMemoryStatusEx` should be used for accurate 64-bit memory reporting.
+*   **Process List Counting Inefficiency**: In `print_process_list`, the code iterates through all processes twice: once to print the first 10, and a second time to count the total number of processes for the "... and X more processes" message. This is inefficient.
+*   **Process List Edge Case**: The `print_process_list` function's message `... and %d more processes` will display a negative number if the total number of processes is less than 10 (e.g., "and -5 more processes" if there are 5 total). This line should only be printed if `total > 10`.
+*   **Display Color Depth Calculation**: In `print_display_info`, `colors = bits * planes;` is used. For modern systems, `BITSPIXEL` directly provides the color depth, and `PLANES` is typically 1. This calculation is redundant and potentially confusing, as `BITSPIXEL` alone is sufficient.
+
+**Performance:**
+*   **Redundant Process Iteration**: As noted under Logic, iterating through the process list twice in `print_process_list` is a minor performance inefficiency.
+
+**DX (Developer Experience):**
+*   **Outdated Compilation Comment**: The comment block at the top of `sysinfo.c` provides a TCC compilation command: `tcc -o sysinfo.exe sysinfo.c -lkernel32 -ladvapi32`. This is incomplete compared to the `README.md`, which correctly includes `-luser32 -lgdi32`. The comment in the source file should be updated for consistency and completeness.
+*   **Makefile Instructions**: The `README.md` mentions a `Makefile` in the project structure but does not provide instructions on how to use it for building, only manual `tcc` or `gcc` commands. If the `Makefile` is functional, adding `make` instructions would enhance DX.
+
+**Consistency:**
+*   Overall naming conventions and output formatting are highly consistent.
+
+**Dead Code:**
+*   No dead code was identified. All functions appear to be called within `main`.
+
+### Step 3: Pick ONE Improvement
+
+The most valuable improvement is to address the **deprecated `MEMORYSTATUS` API usage in `print_memory_info`**. This is a critical logic and accuracy bug that directly impacts the correctness of the reported memory information on modern systems with more than 4GB of RAM. Fixing this ensures the tool provides reliable data, which is fundamental to its purpose.
+
+### Step 4: Executor's Plan
+
+**WHAT** to change:
+The memory information retrieval in the `print_memory_info` function needs to be updated. Specifically, replace the use of the deprecated `MEMORYSTATUS` structure and `GlobalMemoryStatus` function with the modern `MEMORYSTATUSEX` structure and `GlobalMemoryStatusEx` function. This will enable the utility to accurately report physical memory sizes exceeding 4GB.
+
+**WHERE** in the file:
+The modifications will be contained within the `print_memory_info` function in `sysinfo.c`. This involves changing the type of the memory status structure, initializing its size member, updating the function call to retrieve memory information, and adjusting the member names used for total and available physical memory in the subsequent calculations.
+
+**WHY** this matters:
+The `MEMORYSTATUS` structure and its associated `GlobalMemoryStatus` function are outdated and cannot correctly report physical memory sizes beyond 4GB. On any system with more than 4GB of RAM, the values for total and available physical memory will be truncated, leading to incorrect and misleading information being displayed to the user. By migrating to `MEMORYSTATUSEX` and `GlobalMemoryStatusEx`, the utility will leverage 64-bit memory counters, ensuring accurate and reliable reporting of system memory regardless of its size, thus improving the fundamental correctness and utility of the tool.
+
+**HOW** to do it:
+1.  Locate the `print_memory_info` function in `sysinfo.c`.
+2.  Change the declaration of the `ms` variable from `MEMORYSTATUS ms;` to `MEMORYSTATUSEX ms;`.
+3.  Ensure the `dwLength` member of the `ms` structure is correctly initialized to `sizeof(MEMORYSTATUSEX)`.
+4.  Replace the function call `GlobalMemoryStatus(&ms);` with `GlobalMemoryStatusEx(&ms);`.
+5.  Update the calculations for `total_mb`, `avail_mb`, and `used_mb` to use the `ullTotalPhys` and `ullAvailPhys` members of the `ms` structure, instead of `dwTotalPhys` and `dwAvailPhys`. The `dwMemoryLoad` member remains unchanged.
+
+**SCOPE**:
+This is a precise, surgical change confined to a single function. It directly addresses a critical logic flaw related to data accuracy and modern system compatibility without affecting other parts of the codebase or introducing new complexities.
+
+**Executor**: ```json
+{
+  "title": "[LOGIC] Upgrade Memory Info Retrieval for Accuracy",
+  "body": "### Problem / Gap\nThe current implementation of `print_memory_info` in `sysinfo.c` uses the deprecated `MEMORYSTATUS` structure and `GlobalMemoryStatus` function. This results in inaccurate reporting of physical memory sizes exceeding 4GB.\n\n### Solution & Insight\nTo address this issue, we will update the `print_memory_info` function to utilize the modern `MEMORYSTATUSEX` structure and `GlobalMemoryStatusEx` function. This change ensures the utility can accurately report physical memory sizes regardless of the system's RAM.\n\n### Impact\nThe upgrade enhances the tool's accuracy and reliability, particularly on systems with more than 4GB of RAM, by leveraging 64-bit memory counters.",
+  "branch_name": "bot/upgrade-1772750099",
+  "edits": [
+    {
+      "file": "sysinfo.c",
+      "search": "    MEMORYSTATUS ms;\n    ms.dwLength = sizeof(ms);\n    GlobalMemoryStatus(&ms);\n\n    double total_mb = (double)ms.dwTotalPhys / (1024.0 * 1024.0);\n    double avail_mb = (double)ms.dwAvailPhys / (1024.0 * 1024.0);\n    double used_mb = total_mb - avail_mb;\n    int percent_used = (int)ms.dwMemoryLoad;",
+      "replace": "    MEMORYSTATUSEX ms;\n    ms.dwLength = sizeof(MEMORYSTATUSEX);\n    GlobalMemoryStatusEx(&ms);\n\n    double total_mb = (double)ms.ullTotalPhys / (1024.0 * 1024.0);\n    double avail_mb = (double)ms.ullAvailPhys / (1024.0 * 1024.0);\n    double used_mb = total_mb - avail_mb;\n    int percent_used = (int)ms.dwMemoryLoad;"
+    }
+  ]
+}
+```
+
+**Reviewer**: APPROVE: The Executor's proposed edit correctly addresses the deprecated `MEMORYSTATUS` API, replacing it with `MEMORYSTATUSEX` and `GlobalMemoryStatusEx` for accurate 64-bit memory reporting. This directly aligns with the Scanner's recommendation and fixes a critical logic flaw. All validation checks passed: the edit is non-destructive, the search block size is appropriate, it's an exact match, the replacement is functional and compilable, it provides significant value, and it's safe for the repository.
+
+---
