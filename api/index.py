@@ -153,7 +153,7 @@ def read_file_content(repo, file_path):
     """Read file content from repo."""
     try:
         content = repo.get_contents(file_path)
-        return content.decoded_content.decode('utf-8')[:5000]  # Limit size
+        return content.decoded_content.decode('utf-8')
     except Exception as e:
         print(f"File read error for {file_path}: {e}")
         return None
