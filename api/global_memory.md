@@ -1,9 +1,6 @@
 # mayo Global Memory & Experience
 
 - *[ARCHIVED] 1 older lessons were archived to preserve focus.*
-- **Repo: unfetter_proxy**: [DX] Improve Web Session Test Prompts for Clarity. (Ref: https://github.com/HOLYKEYZ/unfetter_proxy/pull/2) - *Status: REJECTED - Joseph closed this Comment: 'joe-gemini , u keep doing shits after shits 
-this is rubbish!!! 
-u wanna delete '*
 - **Repo: unfetter_proxy**: [DX] Improve Groq Web Session Test Feedback. (Ref: https://github.com/HOLYKEYZ/unfetter_proxy/pull/3) - *Status: MERGED - Joseph approved!*
 - **Repo: Alexcathe**: [DX] Update TypeScript target to ES2020. (Ref: https://github.com/HOLYKEYZ/Alexcathe/pull/2) - *Status: MERGED - Joseph approved! Comment: '[vc]: #Cr0NuEf70RwI3UY1RhYbEJNkhdscHr6JuNUY3lvEsLg=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
 - **Repo: ecom-stor**: [DX] Add inline documentation to postcss.config.js plugins. (Ref: https://github.com/HOLYKEYZ/ecom-stor/pull/1) - *Status: MERGED - Joseph approved! Comment: '[vc]: #rnr+551YjaA07lQABHGDprQFSGuQg1w6hrbr4705j20=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
