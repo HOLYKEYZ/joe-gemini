@@ -61,3 +61,4 @@ how'd u come up with this shit, i have an ai pentester..., so why the fuck shoul
 - **REJECTED by Reviewer**: Executor's search block for README.md installation instructions failed to match due to missing blank lines and exceeded the 15-line limit.
 - **REJECTED by Reviewer**: Executor's search block for README.md update exceeded 15-line limit and failed to match due to missing blank lines and use of `...` wildcard, resulting in 'NO CHANGES'. Also missed a part of the Scanner's plan.
 - **REJECTED by Reviewer**: Executor's search blocks for README.md failed to match, resulting in 'NO CHANGES' in diff preview, despite appearing correct. Emphasize exact match including all whitespace and line endings.
+- **REJECTED by Reviewer**: Executor's search block for `IntellectSafe` README installation instructions was too long (18+ lines) and had exact match issues (extra spaces, incorrect markdown structure), leading to 'NO CHANGES'.
