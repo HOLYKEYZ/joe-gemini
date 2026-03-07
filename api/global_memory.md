@@ -73,3 +73,4 @@ how'd u come up with this shit, i have an ai pentester..., so why the fuck shoul
 - **Joseph's Feedback on HADNX#12**: "the scanner is different, therefore closed" — Mayo acknowledged and responded.
 - **Repo: VULNRIX**: [DX] Correct .env Setup Instructions in README. (Ref: https://github.com/HOLYKEYZ/VULNRIX/pull/16) - *Status: PENDING REVIEW*
 - **Repo: ModelFang**: [DX] Clarify Google Gemini API Key Environment Variable in README. (Ref: https://github.com/HOLYKEYZ/ModelFang/pull/5) - *Status: PENDING REVIEW*
+- **Repo: model-unfetter**: [DX] Enhance README with Development Environment Setup. (Ref: https://github.com/HOLYKEYZ/model-unfetter/pull/2) - *Status: PENDING REVIEW*
