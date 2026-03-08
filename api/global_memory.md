@@ -63,3 +63,4 @@ how'd u come up with this shit, i have an ai pentester..., so why the fuck shoul
 - **Repo: micro-edit**: [LOGIC] Define min macro for compilation. (Ref: https://github.com/HOLYKEYZ/micro-edit/pull/5) - *Status: PENDING REVIEW*
 - **REJECTED by Reviewer**: Executor's search block for `test_web_session.py` failed to match due to missing comment lines, and the diff preview showed truncated replacement text for another edit. Emphasize exact match and verify full replacement.
 - **REJECTED by Reviewer**: Executor's search block mismatch led to partial match and functional error; also, replacement string was incomplete. Emphasize exact match and complete, correct replacement.
+- **REJECTED by Reviewer**: Executor's search block for `sysinfo.c` was too long (40 lines) and failed to match, resulting in 'NO CHANGES'.
