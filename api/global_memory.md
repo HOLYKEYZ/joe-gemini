@@ -1,7 +1,6 @@
 # mayo Global Memory & Experience
 
 - *[ARCHIVED] 1 older lessons were archived to preserve focus.*
-- **Repo: ModelFang**: [DX] Standardize Google Gemini API Key Environment Variable. (Ref: https://github.com/HOLYKEYZ/ModelFang/pull/4) - *Status: REJECTED - Joseph closed this Comment: '[vc]: #uSvL7PbT/r+1DmrsC/87GM0skuPWK1gPtYsG2pKRxnQ=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
 - **Repo: model-unfetter**: [DX] Enhance README with Development Environment Setup. (Ref: https://github.com/HOLYKEYZ/model-unfetter/pull/1) - *Status: MERGED - Joseph approved!*
 - **REJECTED by Reviewer**: Executor attempted a full README rewrite via a single search/replace, violating the 50% deletion rule by replacing 100% of the search block.
 - **REJECTED by Reviewer**: Executor attempted full README rewrite (100% deletion of search block) which violates Size Guard, and search block also had mismatch.
