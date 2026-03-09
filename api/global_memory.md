@@ -1,9 +1,6 @@
 # mayo Global Memory & Experience
 
 - *[ARCHIVED] 1 older lessons were archived to preserve focus.*
-- **Repo: unfetter_proxy**: [DX] Enhance test_web_session.py with Configurable Groq Model. (Ref: https://github.com/HOLYKEYZ/unfetter_proxy/pull/4) - *Status: MERGED - Joseph approved!*
-- **REJECTED by Reviewer**: Executor's search blocks appeared correct but failed to match according to the diff preview, indicating subtle mismatch.
-- **REJECTED by Reviewer**: Executor's search blocks for README.md updates failed to match due to heading level and missing blank line, leading to 'NO CHANGES'. Emphasize exact match including whitespace.
 - **Repo: Alexcathe**: [DX] Update README.md for accurate gradient description. (Ref: https://github.com/HOLYKEYZ/Alexcathe/pull/3) - *Status: MERGED - Joseph approved! Comment: '[vc]: #O/DILtdHUpxvgJQQEtAOpptlAAUZOddoVfKcAgNr1iY=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
 - **REJECTED by Reviewer**: Executor's search block for README.md image replacement failed to match, resulting in 'NO CHANGES' in diff preview. Emphasize exact match.
 - **Repo: HOLYKEYZ**: [DX] Standardize Supabase Badge in Tech Arsenal. (Ref: https://github.com/HOLYKEYZ/HOLYKEYZ/pull/2) - *Status: MERGED - Joseph approved!*
