@@ -437,17 +437,19 @@ def query_gemini_scanner(prompt, temperature=0.2):
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": temperature, "maxOutputTokens": 8000}
     }
+    # Key rotation: primary → fallback → primary (alternating to maximize chances)
+    scanner_keys = [GEMINI_API_KEY, GEMINI_FALLBACK_API_KEY, GEMINI_API_KEY]
     for attempt in range(3):
         try:
-            current_key = GEMINI_FALLBACK_API_KEY if attempt > 0 and GEMINI_FALLBACK_API_KEY else GEMINI_API_KEY
+            current_key = scanner_keys[attempt] or GEMINI_API_KEY
             r = requests.post(f"{GEMINI_API_URL}?key={current_key}", json=payload, headers=headers, timeout=120)
             r.raise_for_status()
             return r.json()['candidates'][0]['content']['parts'][0]['text']
         except Exception as e:
-            print(f"Scanner Error (attempt {attempt+1}/3): {e}")
+            print(f"Scanner Error (attempt {attempt+1}/3, key {'primary' if attempt != 1 else 'fallback'}): {e}")
             if attempt < 2:
                 wait = [10, 30, 60][attempt]
-                print(f"DEBUG: Scanner failed. Waiting {wait}s before retry with fallback key...")
+                print(f"DEBUG: Scanner failed. Waiting {wait}s before retry...")
                 time.sleep(wait)
             else:
                 return None
@@ -484,10 +486,10 @@ def query_groq(prompt, api_key=None, temperature=0.1):
     """Executor AI (Llama 3.3 70B) — produces surgical code edits via Groq."""
     if api_key is None:
         api_key = GROK_API_KEY
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': f'Bearer {api_key}'
-    }
+    # On retry, rotate to GROK_FALLBACK_API_KEY if available
+    retry_key = GROK_FALLBACK_API_KEY if GROK_FALLBACK_API_KEY and GROK_FALLBACK_API_KEY != api_key else api_key
+    keys = [api_key, retry_key]
+    
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "user", "content": prompt}],
@@ -496,13 +498,18 @@ def query_groq(prompt, api_key=None, temperature=0.1):
     }
     for attempt in range(2):
         try:
+            current_key = keys[attempt]
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {current_key}'
+            }
             r = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=120)
             r.raise_for_status()
             return r.json()['choices'][0]['message']['content']
         except Exception as e:
-            print(f"Groq/Llama Error (key {api_key[:10]}... attempt {attempt+1}/2): {e}")
+            print(f"Groq/Llama Error (key {current_key[:10]}... attempt {attempt+1}/2): {e}")
             if attempt < 1:
-                print(f"DEBUG: Groq failed. Waiting 15s before retry...")
+                print(f"DEBUG: Groq failed. Waiting 15s before retry with {'fallback' if keys[1] != api_key else 'same'} key...")
                 time.sleep(15)
             else:
                 return None
@@ -545,19 +552,21 @@ def query_gemini_reviewer(prompt, temperature=0.1):
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": temperature, "maxOutputTokens": 8000}
     }
+    # Key rotation: primary → fallback → primary (GEMINI2 keys only, never steal Scanner keys)
+    primary = GEMINI2_API_KEY or GEMINI_API_KEY
+    fallback = GEMINI2_FALLBACK_API_KEY  # No `or GEMINI_FALLBACK_API_KEY` — don't steal Scanner's key
+    reviewer_keys = [primary, fallback or primary, primary]
     for attempt in range(3):
         try:
-            primary = GEMINI2_API_KEY or GEMINI_API_KEY
-            fallback = GEMINI2_FALLBACK_API_KEY or GEMINI_FALLBACK_API_KEY
-            current_key = fallback if attempt > 0 and fallback else primary
+            current_key = reviewer_keys[attempt]
             r = requests.post(f"{GEMINI_API_URL}?key={current_key}", json=payload, headers=headers, timeout=120)
             r.raise_for_status()
             return r.json()['candidates'][0]['content']['parts'][0]['text']
         except Exception as e:
-            print(f"Reviewer Error (attempt {attempt+1}/3): {e}")
+            print(f"Reviewer Error (attempt {attempt+1}/3, key {'primary' if attempt != 1 else 'fallback'}): {e}")
             if attempt < 2:
                 wait = [10, 30, 60][attempt]
-                print(f"DEBUG: Reviewer failed. Waiting {wait}s before retry with fallback key...")
+                print(f"DEBUG: Reviewer failed. Waiting {wait}s before retry...")
                 time.sleep(wait)
             else:
                 return None
