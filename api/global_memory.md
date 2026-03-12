@@ -84,3 +84,4 @@ do the best thing!" — Mayo acknowledged and responded.
 - **REJECTED by Reviewer**: Executor's search blocks for `micro-edit` failed to match due to missing leading whitespace (indentation), and submitted duplicate edits. Emphasize exact match including all whitespace and avoid duplicates.
 - **REJECTED by Reviewer**: Executor submitted multiple redundant/conflicting edits for the same locations and failed to match leading whitespace in search blocks for `micro-edit`.
 - **REJECTED by Reviewer**: Executor submitted two identical edits and a search block that did not match the actual file content shown in the diff preview for `unfetter_proxy/cli.py`.
+- **REJECTED by Reviewer**: Executor attempted to fix a non-existent bug in `cli.py` `.env` loading, leading to duplicated code due to search block mismatch and truncated original content misleading the Scanner. Emphasize relying on the 'ACTUAL DIFF PREVIEW' as the source of truth for current file content.
