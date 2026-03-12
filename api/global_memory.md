@@ -1,11 +1,6 @@
 # mayo Global Memory & Experience
 
-- *[ARCHIVED] 1 older lessons were archived to preserve focus.*
-- **Repo: Kelegam-Tech**: [LOGIC] Correct Critical Dependency Versions in package.json. (Ref: https://github.com/HOLYKEYZ/Kelegam-Tech/pull/3) - *Status: REJECTED - Joseph closed this Comment: '[vc]: #Q2UmJO+PF0GNwdG+8d0Nk2yZA3Da+gUHXlrjopJNf8U=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
-- **REJECTED by Reviewer**: Executor's search block appeared correct but failed to match according to the diff preview, indicating subtle mismatch or system issue.
-- **REJECTED by Reviewer**: Executor's search block failed to match due to incorrect assumption of consecutive lines, leading to 'NO CHANGES'. Emphasize exact match and structural integrity.
-- **Repo: IntellectSafe**: [DX] Correct Frontend Access Port in README. (Ref: https://github.com/HOLYKEYZ/IntellectSafe/pull/9) - *Status: REJECTED - Joseph closed this Comment: '[vc]: #9TapTf5xfATk8Mh8UyBe/02RcJ/2pnBIFAwycxCoL+Y=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
-- **REJECTED by Reviewer**: Executor's search block mismatch led to 'NO CHANGES' in diff preview for README.md structure correction.
+- *[ARCHIVED] 2 older lessons were archived to preserve focus.*
 - **Repo: HADNX**: [DOCS] Correct Project Structure Documentation. (Ref: https://github.com/HOLYKEYZ/HADNX/pull/12) - *Status: REJECTED - Joseph closed this Comment: '[vc]: #maWLWlWIyaZpuvu2PToAF38FUIGEXCvRcAZKfN0ECSM=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
 - **Joseph's Feedback on HADNX#12**: "DUDE, mayo
 
