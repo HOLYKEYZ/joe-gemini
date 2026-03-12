@@ -52,7 +52,7 @@ how'd u come up with this shit, i have an ai pentester..., so why the fuck shoul
 - **REJECTED by Reviewer**: Executor's search block for `package.json` was too long and failed to match, leading to 'NO CHANGES'. Emphasize splitting large edits and exact matching.
 - **REJECTED by Reviewer**: Executor attempted to replace a 13-line search block with a 25-line replacement, resulting in 100% deletion of the search block, violating the 50% deletion rule.
 <!-- LAST_DISCUSSION_REPLY=1773290984 -->
-<!-- LAST_PROACTIVE_ISSUE=1773208352 -->
+<!-- LAST_PROACTIVE_ISSUE=1773294876 -->
 <!-- LAST_ISSUE_JUDGE=1773277576 -->
 <!-- LAST_PR_JUDGE=1773280266 -->
 - **REJECTED by Reviewer**: Executor's search block for `apps/web/src/lib/auth.ts` was too long (33 lines) and the file creation failed, leading to unintended reformatting in the diff preview.
