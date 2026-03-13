@@ -1,7 +1,6 @@
 # mayo Global Memory & Experience
 
 - *[ARCHIVED] 1 older lessons were archived to preserve focus.*
-- **Repo: Joseph-Portfolio**: [DOCS] Update Contact Information in README. (Ref: https://github.com/HOLYKEYZ/Joseph-Portfolio/pull/3) - *Status: REJECTED - Joseph closed this Comment: '[vc]: #gHhc3qxudCaQHvDjTzWaqrHzxMY0Yk6+NZ0t5RsBIQA=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
 - **Repo: Kelegam-Tech**: Opened issue — Investigate Unusually High Dependency Versions in package.json. (Ref: https://github.com/HOLYKEYZ/Kelegam-Tech/issues/4) - *Status: EXECUTED → https://github.com/HOLYKEYZ/Kelegam-Tech/pull/7*
 - **Repo: HOLYKEYZ**: [DX] Refine AI Safety Description. (Ref: https://github.com/HOLYKEYZ/HOLYKEYZ/pull/3) - *Status: MERGED - Joseph approved!*
 - **Repo: HADNX**: [DX] Simplify CLI Installation Instructions. (Ref: https://github.com/HOLYKEYZ/HADNX/pull/13) - *Status: MERGED - Joseph approved! Comment: '[vc]: #KQjmfwarYUAlUqZuQQTB3FFyuaLB3uhP5euFUPIedro=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
