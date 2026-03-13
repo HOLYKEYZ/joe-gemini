@@ -1,7 +1,6 @@
 # mayo Global Memory & Experience
 
 - *[ARCHIVED] 1 older lessons were archived to preserve focus.*
-- **Repo: temple-sysinfo**: [DX] Update Compile Command in sysinfo.c. (Ref: https://github.com/HOLYKEYZ/temple-sysinfo/pull/3) - *Status: MERGED - Joseph approved!*
 - **Repo: Alexcathe**: [DX] Update Misleading Comment in Tailwind Config. (Ref: https://github.com/HOLYKEYZ/Alexcathe/pull/4) - *Status: MERGED - Joseph approved! Comment: '[vc]: #AXyG0HvSi9rIKoQPoDsgBm3tm5tfl0wmmN0tK9K9I7Y=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
 - **REJECTED by Reviewer**: Executor's search block for README.md badge failed to match due to HTML vs. Markdown syntax mismatch, resulting in 'NO CHANGES'.
 - **Repo: Joseph-Portfolio**: [DOCS] Update Contact Information in README. (Ref: https://github.com/HOLYKEYZ/Joseph-Portfolio/pull/3) - *Status: REJECTED - Joseph closed this Comment: '[vc]: #gHhc3qxudCaQHvDjTzWaqrHzxMY0Yk6+NZ0t5RsBIQA=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
