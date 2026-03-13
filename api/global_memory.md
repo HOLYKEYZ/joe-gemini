@@ -1,7 +1,6 @@
 # mayo Global Memory & Experience
 
 - *[ARCHIVED] 1 older lessons were archived to preserve focus.*
-- **Repo: Kelegam-Tech**: Opened issue — Investigate Unusually High Dependency Versions in package.json. (Ref: https://github.com/HOLYKEYZ/Kelegam-Tech/issues/4) - *Status: EXECUTED → https://github.com/HOLYKEYZ/Kelegam-Tech/pull/7*
 - **Repo: HOLYKEYZ**: [DX] Refine AI Safety Description. (Ref: https://github.com/HOLYKEYZ/HOLYKEYZ/pull/3) - *Status: MERGED - Joseph approved!*
 - **Repo: HADNX**: [DX] Simplify CLI Installation Instructions. (Ref: https://github.com/HOLYKEYZ/HADNX/pull/13) - *Status: MERGED - Joseph approved! Comment: '[vc]: #KQjmfwarYUAlUqZuQQTB3FFyuaLB3uhP5euFUPIedro=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
 - **REJECTED by Reviewer**: Executor's search block for README.md installation instructions failed to match due to missing blank lines and exceeded the 15-line limit.
@@ -65,19 +64,19 @@ do the best thing!" — Mayo acknowledged and responded.
 - **REJECTED by Reviewer**: Executor submitted multiple redundant/conflicting edits for the same locations and failed to match leading whitespace in search blocks for `micro-edit`.
 - **REJECTED by Reviewer**: Executor submitted two identical edits and a search block that did not match the actual file content shown in the diff preview for `unfetter_proxy/cli.py`.
 - **REJECTED by Reviewer**: Executor attempted to fix a non-existent bug in `cli.py` `.env` loading, leading to duplicated code due to search block mismatch and truncated original content misleading the Scanner. Emphasize relying on the 'ACTUAL DIFF PREVIEW' as the source of truth for current file content.
-- **Repo: micro-edit**: [LOGIC] Implement NULL Checks for Memory Allocation. (Ref: https://github.com/HOLYKEYZ/micro-edit/pull/6) - *Status: PENDING REVIEW*
-- **Repo: model-unfetter**: [REFACTOR] Enhance ProgressBar Robustness in unfetter/utils/logging.py. (Ref: https://github.com/HOLYKEYZ/model-unfetter/pull/4) - *Status: PENDING REVIEW*
+- **Repo: micro-edit**: [LOGIC] Implement NULL Checks for Memory Allocation. (Ref: https://github.com/HOLYKEYZ/micro-edit/pull/6) - *Status: MERGED - Joseph approved! Comment: '@gemini-code-assist , good?'*
+- **Repo: model-unfetter**: [REFACTOR] Enhance ProgressBar Robustness in unfetter/utils/logging.py. (Ref: https://github.com/HOLYKEYZ/model-unfetter/pull/4) - *Status: MERGED - Joseph approved! Comment: '@gemini-code-assist , good?'*
 - **REJECTED by Reviewer**: Executor failed to delete a file using `search: ""`, `replace: ""` for `components/LogoMarquee.tsx`, resulting in 'NO CHANGES' in the diff preview.
 - **Repo: Joseph-Portfolio**: [DOCS] Clarify Purpose of generate_flowchart.py and mayo_flowchart.png in README.md. (Ref: https://github.com/HOLYKEYZ/Joseph-Portfolio/pull/6) - *Status: PENDING REVIEW*
 - **Repo: Kelegam-Tech**: [REFACTOR] Enhance Styling Logic in WhatWeDo Component. (Ref: https://github.com/HOLYKEYZ/Kelegam-Tech/pull/8) - *Status: PENDING REVIEW*
-- **Repo: unfetter_proxy**: [LOGIC] Improve SessionStore Error Handling in session.py. (Ref: https://github.com/HOLYKEYZ/unfetter_proxy/pull/7) - *Status: PENDING REVIEW*
-- **Repo: Alexcathe**: [REFACTOR] Extract Background Logic from HeroSection. (Ref: https://github.com/HOLYKEYZ/Alexcathe/pull/7) - *Status: PENDING REVIEW*
+- **Repo: unfetter_proxy**: [LOGIC] Improve SessionStore Error Handling in session.py. (Ref: https://github.com/HOLYKEYZ/unfetter_proxy/pull/7) - *Status: MERGED - Joseph approved!*
+- **Repo: Alexcathe**: [REFACTOR] Extract Background Logic from HeroSection. (Ref: https://github.com/HOLYKEYZ/Alexcathe/pull/7) - *Status: REJECTED - Joseph closed this Comment: '[vc]: #yotDgivhKKKF72GjJWfyVMmg/tVAmXLoPlAJit/x6IE=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
 - **Repo: HOLYKEYZ**: Opened issue — Clarify Usage of `last_updated.txt` in README. (Ref: https://github.com/HOLYKEYZ/HOLYKEYZ/issues/6) - *Status: AWAITING JOSEPH'S INPUT*
-- **Repo: temple-sysinfo**: [FEAT] Enhance CPU Information with Model Name. (Ref: https://github.com/HOLYKEYZ/temple-sysinfo/pull/5) - *Status: PENDING REVIEW*
+- **Repo: temple-sysinfo**: [FEAT] Enhance CPU Information with Model Name. (Ref: https://github.com/HOLYKEYZ/temple-sysinfo/pull/5) - *Status: MERGED - Joseph approved!*
 - **REJECTED by Reviewer**: Executor's search blocks for render.yaml failed to match due to incorrect indentation, leading to YAML formatting errors. Emphasize exact match including all leading whitespace.
-- **Repo: HADNX**: [DX] Update Repository URLs in pyproject.toml. (Ref: https://github.com/HOLYKEYZ/HADNX/pull/15) - *Status: PENDING REVIEW*
-- **Repo: git-pulse**: [REFACTOR] Unify Contribution Heatmap Colors with Tailwind Configuration. (Ref: https://github.com/HOLYKEYZ/git-pulse/pull/6) - *Status: PENDING REVIEW*
-- **Repo: IntellectSafe**: [FEAT] Enhance Deepfake Detection Test with Assertions. (Ref: https://github.com/HOLYKEYZ/IntellectSafe/pull/12) - *Status: PENDING REVIEW*
+- **Repo: HADNX**: [DX] Update Repository URLs in pyproject.toml. (Ref: https://github.com/HOLYKEYZ/HADNX/pull/15) - *Status: MERGED - Joseph approved! Comment: '[vc]: #KMK0Wr3dzV8K4QbW/MeqyEx7cCjWJpGtOnUw4azMCaY=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
+- **Repo: git-pulse**: [REFACTOR] Unify Contribution Heatmap Colors with Tailwind Configuration. (Ref: https://github.com/HOLYKEYZ/git-pulse/pull/6) - *Status: MERGED - Joseph approved! Comment: '@gemini-code-assist , good?'*
+- **Repo: IntellectSafe**: [FEAT] Enhance Deepfake Detection Test with Assertions. (Ref: https://github.com/HOLYKEYZ/IntellectSafe/pull/12) - *Status: MERGED - Joseph approved! Comment: '[vc]: #6ML6wp2ECWDGuACgG55YYKT/SEd3VvdkO+yt2ronH+Q=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0'*
 - **Joseph's Feedback on Alexcathe#7**: "@mayo , it failed during build therefore not deploying to vercel, thefore closing, fix it
 Why did it fail on deployment" — Mayo acknowledged and responded.
 - **Joseph's Feedback on Alexcathe#7**: "mayo , 19:26:45.057 Running build in Washington, D.C., USA (East) – iad1
