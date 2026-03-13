@@ -1179,8 +1179,28 @@ OUTPUT FORMAT (Strict JSON, nothing else):
   ]
 }}
 """
-            code_response = query_groq(executor_prompt)
-            parsed = extract_json_from_response(code_response)
+            # Run Dual Executors + Gemini Fallback (same architecture as cron Phase 2)
+            executor1_resp = query_groq(executor_prompt, api_key=os.environ.get('GROK_API_KEY'))
+            executor2_resp = query_groq(executor_prompt, api_key=os.environ.get('GROK_2ND_EXECUTOR_API_KEY'))
+            
+            data1 = extract_json_from_response(executor1_resp) if executor1_resp else None
+            data2 = extract_json_from_response(executor2_resp) if executor2_resp else None
+            
+            parsed = None
+            if (data1 and 'edits' in data1) or (data2 and 'edits' in data2):
+                parsed = data1 if (data1 and 'edits' in data1) else data2
+                if data1 and data2 and 'edits' in data1 and 'edits' in data2:
+                    parsed['edits'].extend(data2['edits'])
+            else:
+                # Fallback: Groq Fallback Key
+                fb1_resp = query_groq(executor_prompt, api_key=os.environ.get('GROK_FALLBACK_API_KEY'))
+                parsed = extract_json_from_response(fb1_resp) if fb1_resp else None
+                
+                if not parsed or 'edits' not in parsed:
+                    # Ultimate Fallback: Gemini Executor
+                    fb2_resp = query_gemini_executor(executor_prompt)
+                    if fb2_resp:
+                        parsed = extract_json_from_response(fb2_resp)
             
             if parsed and 'edits' in parsed:
                 # Group edits by file
@@ -1194,12 +1214,19 @@ OUTPUT FORMAT (Strict JSON, nothing else):
                 
                 # Apply edits
                 file_changes = {}
+                failed_edits = []
                 for fpath, edits in file_edits.items():
                     content = read_file_content(repo, fpath)
-                    if not content: continue
+                    if not content:
+                        failed_edits.append(f"`{fpath}`: file not found or empty")
+                        continue
                     new_content = apply_surgical_edits(content, edits)
                     if new_content != content:
                         file_changes[fpath] = new_content
+                    else:
+                        for edit in edits:
+                            search_preview = (edit.get('search', ''))[:80].replace('\n', '\\n')
+                            failed_edits.append(f"`{fpath}`: `{search_preview}...`")
                 
                 if file_changes:
                     # Decide branch
@@ -1215,6 +1242,8 @@ OUTPUT FORMAT (Strict JSON, nothing else):
                     commit_title = parsed.get('title', f"Fix: Addressed feedback in #{issue_number}")
                     if commit_changes_via_api(repo, branch, file_changes, commit_title):
                         msg = f"✅ Committed changes to `{branch}`.\n\nDescription: {parsed.get('body', commit_title)}"
+                        if failed_edits:
+                            msg += f"\n\n⚠️ Some edits failed to match:\n" + "\n".join(f"- {fe}" for fe in failed_edits[:5])
                         issue.create_comment(msg)
                         
                         if not issue.pull_request:
@@ -1226,7 +1255,8 @@ OUTPUT FORMAT (Strict JSON, nothing else):
                     else:
                         issue.create_comment("⚠️ Executor generated edits, but the commit failed. Check logs.")
                 else:
-                    issue.create_comment("⚠️ Executor generated edits, but they did not match the file contents (search blocks failed).")
+                    debug_info = "\n".join(f"- {fe}" for fe in failed_edits[:5]) if failed_edits else "No debug info available"
+                    issue.create_comment(f"⚠️ Executor generated edits, but none matched the file contents.\n\n**Failed search blocks:**\n{debug_info}\n\n*Retrying on next trigger.*")
             else:
                  issue.create_comment("⚠️ Executor failed to generate valid JSON edits.")
     except Exception as e:
