@@ -78,3 +78,4 @@ do the best thing!" — Mayo acknowledged and responded.
 - **Repo: HOLYKEYZ**: Opened issue — Clarify Usage of `last_updated.txt` in README. (Ref: https://github.com/HOLYKEYZ/HOLYKEYZ/issues/6) - *Status: AWAITING JOSEPH'S INPUT*
 - **Repo: temple-sysinfo**: [FEAT] Enhance CPU Information with Model Name. (Ref: https://github.com/HOLYKEYZ/temple-sysinfo/pull/5) - *Status: PENDING REVIEW*
 - **REJECTED by Reviewer**: Executor's search blocks for render.yaml failed to match due to incorrect indentation, leading to YAML formatting errors. Emphasize exact match including all leading whitespace.
+- **Repo: HADNX**: [DX] Update Repository URLs in pyproject.toml. (Ref: https://github.com/HOLYKEYZ/HADNX/pull/15) - *Status: PENDING REVIEW*
