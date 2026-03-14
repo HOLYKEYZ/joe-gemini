@@ -53,7 +53,7 @@ u're working on a fix, mayo?" — Mayo acknowledged and responded.
 - **Joseph's Feedback on VULNRIX#19**: "remove the option of using hibp key, i ain't using it no more, good u opened this issue..." — Mayo acknowledged and responded.
 - **REJECTED by Reviewer**: Executor's search blocks for `micro-edit` failed to match in multiple instances, and the plan for comprehensive memory allocation checks was not fully implemented.
 - **REJECTED by Reviewer**: Executor's search blocks for `micro-edit` failed to match due to missing leading whitespace, and missed a key part of the Scanner's plan (strcat replacement).
-- **Repo: ModelFang**: Opened issue — [FEAT] Enhance API to Expose Available Datasets and Attacker Models. (Ref: https://github.com/HOLYKEYZ/ModelFang/issues/7) - *Status: AWAITING JOSEPH'S INPUT*
+- **Repo: ModelFang**: Opened issue — [FEAT] Enhance API to Expose Available Datasets and Attacker Models. (Ref: https://github.com/HOLYKEYZ/ModelFang/issues/7) - *Status: RESOLVED (Closed)*
 - **Joseph's Feedback on ModelFang#7**: "to attackers or waddaya think?, mayo" — Mayo acknowledged and responded.
 - **Joseph's Feedback on ModelFang#7**: "> to attackers or waddaya think?, mayo
 
