@@ -87,3 +87,4 @@ Why did it fail on deployment" — Mayo acknowledged and responded.
 - **Joseph's Feedback on ModelFang#7**: "nope, it means u should fix this issue u opened" — Mayo acknowledged and responded.
 - **REJECTED by Reviewer**: Executor's search block for YAML failed to match leading whitespace, causing destructive indentation changes and submitting redundant/conflicting edits.
 - **Repo: ModelFang**: [DX] Standardize API Key Environment Variable Names. (Ref: https://github.com/HOLYKEYZ/ModelFang/pull/8) - *Status: PENDING REVIEW*
+- **REJECTED by Reviewer**: Executor's search block for `extract_json_from_response` in `api/index.py` was incorrect, leading to destructive deletion of unrelated code (`commit_changes_via_api`). Also, multiple edits failed to match, and conflicting/duplicate edits were submitted.
